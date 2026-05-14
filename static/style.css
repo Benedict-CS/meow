@@ -696,7 +696,7 @@ body.select-mode .item.selected::before {
   font: inherit; font-size: .8rem; outline: none; width: 110px;
 }
 
-.lb-prev, .lb-next, .lb-fav, .lb-slideshow, .lb-download {
+.lb-prev, .lb-next, .lb-fav, .lb-slideshow, .lb-download, .lb-share {
   position: absolute;
   background: rgba(255,255,255,.12);
   border: none;
@@ -709,11 +709,12 @@ body.select-mode .item.selected::before {
   border-radius: 50%; font-size: 1.3rem;
 }
 .lb-prev:hover, .lb-next:hover,
-.lb-fav:hover, .lb-slideshow:hover, .lb-download:hover {
+.lb-fav:hover, .lb-slideshow:hover, .lb-download:hover, .lb-share:hover {
   background: rgba(255,255,255,.25); transform: scale(1.05);
 }
 .lb-download { top: 20px; left: 132px; font-size: 1.5rem; }
-.lb-download.busy {
+.lb-share    { top: 20px; left: 188px; font-size: 1.05rem; }
+.lb-download.busy, .lb-share.busy {
   pointer-events: none;
   opacity: .6;
   animation: pulse 1.2s ease-in-out infinite;
@@ -1149,6 +1150,7 @@ body {
   .lb-fav { top: max(14px, env(safe-area-inset-top, 0px) + 8px); left: 14px; }
   .lb-slideshow { top: max(14px, env(safe-area-inset-top, 0px) + 8px); left: 64px; }
   .lb-download  { top: max(14px, env(safe-area-inset-top, 0px) + 8px); left: 114px; width: 40px; height: 40px; font-size: 1.2rem; }
+  .lb-share     { top: max(14px, env(safe-area-inset-top, 0px) + 8px); left: 164px; width: 40px; height: 40px; font-size: .95rem; }
   .lb-close {
     top: max(14px, env(safe-area-inset-top, 0px) + 8px);
     right: 14px;

@@ -782,6 +782,41 @@ async function downloadOrShare() {
 }
 lbDownload.addEventListener('click', (e) => { e.stopPropagation(); downloadOrShare(); });
 
+// ---------- Share link (deep link to this photo) ----------
+const lbShare = $('#lb-share');
+async function shareLink() {
+  const it = currentLbItem();
+  if (!it || lbShare.classList.contains('busy')) return;
+  lbShare.classList.add('busy');
+  try {
+    const url = `${location.origin}/#v=${encodeURIComponent(it.name)}`;
+    const title = it.caption || '貓貓相簿 🐾';
+    const text  = it.caption ? `${it.caption} — 來自貓貓相簿` : '快來看這張喵喵 🐾';
+
+    // Web Share API — iOS Safari / Android Chrome open native share sheet
+    if (navigator.share) {
+      try {
+        await navigator.share({ url, title, text });
+        return;
+      } catch (e) {
+        if (e && e.name === 'AbortError') return;  // user cancelled
+        // fall through to clipboard
+      }
+    }
+    // Desktop fallback: copy to clipboard
+    try {
+      await navigator.clipboard.writeText(url);
+      toast('連結已複製 🔗 (' + url.replace(location.origin, '') + ')', 'ok');
+      return;
+    } catch {}
+    // Last resort: prompt with the URL so user can copy manually
+    window.prompt('連結（複製這個 URL）：', url);
+  } finally {
+    lbShare.classList.remove('busy');
+  }
+}
+lbShare.addEventListener('click', (e) => { e.stopPropagation(); shareLink(); });
+
 // slideshow
 function startSlideshow() {
   if (state.slideshowTimer) return;
@@ -820,6 +855,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === ' ') { e.preventDefault(); if (state.slideshowTimer) stopSlideshow(); else startSlideshow(); }
   else if (e.key === 'f' || e.key === 'F') lbFav.click();
   else if (e.key === 'd' || e.key === 'D') lbDownload.click();
+  else if (e.key === 's' || e.key === 'S') lbShare.click();
 });
 
 // ---------- Batch meta (favorite / tag) ----------
