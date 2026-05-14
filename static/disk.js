@@ -69,15 +69,6 @@ async function load() {
       <div class="row hint"><span>估計還可放</span><b>~ ${moreFiles.toLocaleString()} 張</b></div>
       <div class="row hint"><span>位置</span><b>${s.data_dir}</b></div>
     </section>
-
-    <section class="card tips">
-      <h2>📦 想擴容？</h2>
-      <p>Ubuntu Server 預設 LVM 只用一半，可以線上擴：</p>
-      <pre><code>sudo lvextend -l +100%FREE /dev/mapper/ubuntu--vg-ubuntu--lv
-sudo resize2fs /dev/mapper/ubuntu--vg-ubuntu--lv
-df -h /</code></pre>
-      <p class="tiny">不用停 docker、不用重開機。</p>
-    </section>
   `;
 
   document.querySelector('#updated').textContent =
