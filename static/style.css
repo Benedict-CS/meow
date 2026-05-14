@@ -771,12 +771,22 @@ body.select-mode .item.selected::before {
   pointer-events: none;
   z-index: 3;
 }
+/* Processing spinner: three bouncing paw prints */
 .processing-spin {
-  width: 32px; height: 32px;
-  border: 3px solid rgba(217,136,107,.25);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.9s linear infinite;
+  display: flex;
+  gap: 4px;
+  font-size: 1.3rem;
+  line-height: 1;
+}
+.processing-spin span {
+  display: inline-block;
+  animation: paw-bounce 0.9s ease-in-out infinite;
+}
+.processing-spin span:nth-child(2) { animation-delay: 0.15s; }
+.processing-spin span:nth-child(3) { animation-delay: 0.30s; }
+@keyframes paw-bounce {
+  0%, 100% { transform: translateY(0)    scale(1);     opacity: .55; }
+  50%      { transform: translateY(-8px) scale(1.15);  opacity: 1;   }
 }
 .processing-label {
   font-family: 'Caveat', 'Noto Sans TC', cursive;
@@ -784,7 +794,6 @@ body.select-mode .item.selected::before {
   font-size: 1rem;
   letter-spacing: 1px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Lightbox caption explicit Save / Cancel */
 .lb-caption-actions {
@@ -842,6 +851,120 @@ body.select-mode .item.selected::before {
 @media (max-width: 640px) {
   .select-bar .select-actions { flex: 1 1 100%; justify-content: flex-end; }
   .select-bar .select-actions button { flex: 0 0 auto; }
+}
+
+/* ==========================================================
+   Cute touches — heart burst, dragover wiggle, sleepy empty
+   state, slideshow entrance transitions
+   ========================================================== */
+
+/* Heart burst on favorite */
+.heart-burst {
+  position: fixed;
+  font-size: 1.6rem;
+  pointer-events: none;
+  z-index: 300;
+  transform: translate(-50%, -50%);
+  animation: heart-pop 1.15s cubic-bezier(.18,.72,.34,1) forwards;
+  text-shadow: 0 2px 6px rgba(0,0,0,.18);
+  will-change: transform, opacity;
+}
+@keyframes heart-pop {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(.4)  rotate(0); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.35) rotate(var(--rot, 0deg)); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), calc(-50% + var(--dy, -90px))) scale(.85) rotate(var(--rot, 0deg)); }
+}
+
+/* Drop-zone gets playful when files are over it */
+.drop-zone { position: relative; }
+.drop-zone .drop-icon { transition: transform .2s ease; }
+.drop-zone.dragover .drop-icon {
+  animation: cat-wiggle .42s ease-in-out infinite alternate;
+}
+@keyframes cat-wiggle {
+  from { transform: rotate(-9deg) scale(1.10); }
+  to   { transform: rotate(9deg)  scale(1.20); }
+}
+.drop-zone.dragover::before,
+.drop-zone.dragover::after {
+  content: "🐾";
+  position: absolute;
+  font-size: 1.6rem;
+  opacity: .85;
+  pointer-events: none;
+  animation: paw-step .9s ease-in-out infinite;
+}
+.drop-zone.dragover::before {
+  top: 14px; left: 18px;
+  transform-origin: center;
+  --r: -25deg;
+}
+.drop-zone.dragover::after {
+  bottom: 14px; right: 18px;
+  --r: 25deg;
+  animation-delay: .45s;
+}
+@keyframes paw-step {
+  0%, 100% { opacity: .45; transform: translateY(0)    rotate(var(--r, 0deg)); }
+  50%      { opacity: 1;   transform: translateY(-7px) rotate(var(--r, 0deg)); }
+}
+
+/* Empty state: sleeping cat + floating Zzz */
+.empty-emoji {
+  position: relative;
+  display: inline-block;
+  font-size: 4rem;
+  animation: cat-breathe 3.4s ease-in-out infinite;
+}
+.empty-emoji::before,
+.empty-emoji::after {
+  position: absolute;
+  font-family: 'Caveat', 'Noto Sans TC', cursive;
+  color: var(--ink-faint);
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  animation: zfloat 3s ease-in-out infinite;
+}
+.empty-emoji::before {
+  content: "z";
+  font-size: 1.4rem;
+  top: -6px; right: -20px;
+}
+.empty-emoji::after {
+  content: "z";
+  font-size: 2rem;
+  top: -28px; right: -34px;
+  animation-delay: 1.2s;
+}
+@keyframes cat-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.06); }
+}
+@keyframes zfloat {
+  0%   { opacity: 0; transform: translate(0,  10px) scale(.5) rotate(-8deg); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(30px, -30px) scale(1.3) rotate(15deg); }
+}
+
+/* Lightbox entrance transitions — randomly assigned per slide */
+.lb-content > .enter-fade   { animation: enter-fade  .35s ease; }
+.lb-content > .enter-right  { animation: enter-right .35s cubic-bezier(.2,.7,.3,1); }
+.lb-content > .enter-left   { animation: enter-left  .35s cubic-bezier(.2,.7,.3,1); }
+.lb-content > .enter-zoom   { animation: enter-zoom  .38s cubic-bezier(.2,.7,.3,1); }
+.lb-content > .enter-up     { animation: enter-up    .35s cubic-bezier(.2,.7,.3,1); }
+@keyframes enter-fade  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes enter-right { from { opacity: 0; transform: translateX(60px)  scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes enter-left  { from { opacity: 0; transform: translateX(-60px) scale(.96); } to { opacity: 1; transform: none; } }
+@keyframes enter-zoom  { from { opacity: 0; transform: scale(.85); }                  to { opacity: 1; transform: none; } }
+@keyframes enter-up    { from { opacity: 0; transform: translateY(40px); }            to { opacity: 1; transform: none; } }
+
+/* Slideshow "stage" — subtle darker vignette while playing */
+.lightbox.playing {
+  background: radial-gradient(ellipse at 50% 50%, rgba(40,30,20,.92), rgba(10,5,2,.98));
+}
+.lb-slideshow.playing {
+  box-shadow: 0 0 0 3px rgba(217,136,107,.4), 0 0 20px rgba(217,136,107,.3);
 }
 
 /* ==========================================================

@@ -31,6 +31,52 @@ function toast(msg, kind = '') {
   toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
 }
 
+// Cute toast — pick a random phrase from a category.
+const PHRASES = {
+  saved:    ['儲存好了 🐾', '記下了 ✨', '貓貓滿意 😺', '咕嚕咕嚕～', '收下了 💝', '寫進相簿了 📒'],
+  fav_on:   ['加入最愛 💖', '貓貓也愛這張 ❤️', '永久珍藏 ✨', '收進喵心 💝', '今天的小確幸 🌸'],
+  fav_off:  ['取消最愛了', '下次再說 〜', '從最愛拿出來了'],
+  uploaded: ['上傳完成 🐱', '又多幾張喵喵 🎉', '可愛收齊 ✨', '相簿更胖了 🐾', '貓口普查 +N 🐈'],
+  deleted:  ['再見 👋', '已刪除 🗑', '送走了 〜'],
+  error:    ['出了點事 😿', '失敗了，再試試？', '貓貓困惑了 ❓'],
+};
+function cuteToast(key, fallback, kind = '') {
+  const arr = PHRASES[key];
+  const msg = (arr && arr.length) ? arr[Math.floor(Math.random() * arr.length)] : (fallback || '');
+  toast(msg, kind);
+}
+
+// ---------- Heart burst (clicking ❤️) ----------
+function spawnHearts(originEl) {
+  const r = originEl.getBoundingClientRect();
+  const cx = r.left + r.width / 2;
+  const cy = r.top  + r.height / 2;
+  const n = 4 + Math.floor(Math.random() * 3); // 4..6
+  const colors = ['#ec5e6b', '#ff8a95', '#ffb1b8', '#d9886b', '#f06292'];
+  const glyphs = ['♥', '♡', '❤', '💕'];
+  for (let i = 0; i < n; i++) {
+    const h = document.createElement('div');
+    h.className = 'heart-burst';
+    h.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+    h.style.left = cx + 'px';
+    h.style.top  = cy + 'px';
+    h.style.color = colors[i % colors.length];
+    h.style.setProperty('--dx',  ((Math.random() * 110) - 55) + 'px');
+    h.style.setProperty('--dy',  -(50 + Math.random() * 80) + 'px');
+    h.style.setProperty('--rot', ((Math.random() * 70) - 35) + 'deg');
+    h.style.animationDelay = (i * 0.04) + 's';
+    document.body.appendChild(h);
+    setTimeout(() => h.remove(), 1300);
+  }
+}
+
+// ---------- Lightbox enter transitions (random per slide) ----------
+const ENTER_CLASSES = ['enter-fade', 'enter-right', 'enter-left', 'enter-zoom', 'enter-up'];
+function pickEnter() {
+  return ENTER_CLASSES[Math.floor(Math.random() * ENTER_CLASSES.length)];
+}
+const SLIDESHOW_MS = 2000;
+
 // ---------- Helpers ----------
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
@@ -275,11 +321,12 @@ function renderItem(it, idx) {
     e.stopPropagation();
     if (state.selectMode) return;
     const newFav = !it.favorite;
+    if (newFav) spawnHearts(fav);
     try {
       await apiPatchMeta(it.name, { favorite: newFav });
       it.favorite = newFav;
       render();
-    } catch { toast('更新失敗', 'error'); }
+    } catch { cuteToast('error', '更新失敗', 'error'); }
   });
   node.appendChild(fav);
 
@@ -293,9 +340,9 @@ function renderItem(it, idx) {
     if (state.selectMode) return;
     if (!confirm(`真的要刪除「${it.name}」嗎？`)) return;
     if (await apiDelete(it.name)) {
-      toast('已刪除', 'ok');
+      cuteToast('deleted', '已刪除', 'ok');
       await apiList(); render();
-    } else toast('刪除失敗', 'error');
+    } else cuteToast('error', '刪除失敗', 'error');
   });
   node.appendChild(del);
 
@@ -303,7 +350,7 @@ function renderItem(it, idx) {
   if (it.processing) {
     const overlay = document.createElement('div');
     overlay.className = 'processing-overlay';
-    overlay.innerHTML = `<div class="processing-spin"></div><div class="processing-label">處理中…</div>`;
+    overlay.innerHTML = `<div class="processing-spin"><span>🐾</span><span>🐾</span><span>🐾</span></div><div class="processing-label">處理中…</div>`;
     node.appendChild(overlay);
   }
 
@@ -395,10 +442,13 @@ function handleFiles(fileList) {
         setTimeout(async () => {
           await apiList(); render();
           closeUploadModal();
-          const msg = dupCount
-            ? `${files.length - dupCount} 個上傳完成，${dupCount} 個是重複的`
-            : `上傳完成 ${files.length} 個 🐱`;
-          toast(msg, dupCount === files.length ? '' : 'ok');
+          if (dupCount === files.length) {
+            toast(`${dupCount} 個是重複的，已合併`, '');
+          } else {
+            const phrase = PHRASES.uploaded[Math.floor(Math.random() * PHRASES.uploaded.length)]
+              .replace('+N', `+${files.length - dupCount}`);
+            toast(dupCount ? `${phrase}（${dupCount} 個重複）` : phrase, 'ok');
+          }
         }, 700);
       }
     });
@@ -543,9 +593,11 @@ function showLb() {
   const it = currentLbItem();
   if (!it) return closeLightbox();
   lbContent.innerHTML = '';
+  const cls = pickEnter();
   if (it.kind === 'image') {
     const img = document.createElement('img');
     img.src = it.url;
+    img.className = cls;
     lbContent.appendChild(img);
   } else {
     const v = document.createElement('video');
@@ -553,6 +605,7 @@ function showLb() {
     v.controls = true;
     v.autoplay = true;
     v.playsInline = true;
+    v.className = cls;
     lbContent.appendChild(v);
   }
   const items = visibleItems();
@@ -590,9 +643,9 @@ async function commitCaptionEdit() {
   try {
     await apiPatchMeta(it.name, { caption: newVal });
     it.caption = newVal;
-    toast('已儲存 ✓', 'ok');
+    cuteToast('saved', '已儲存 ✓', 'ok');
     render();
-  } catch { toast('更新失敗', 'error'); }
+  } catch { cuteToast('error', '更新失敗', 'error'); }
   lbCaptionActions.hidden = true;
   showLb();
 }
@@ -679,27 +732,31 @@ lbFav.addEventListener('click', async () => {
   const it = currentLbItem();
   if (!it) return;
   const newFav = !it.favorite;
+  if (newFav) spawnHearts(lbFav);
   try {
     await apiPatchMeta(it.name, { favorite: newFav });
     it.favorite = newFav;
     lbFav.textContent = newFav ? '❤️' : '♡';
     lbFav.classList.toggle('active', newFav);
+    cuteToast(newFav ? 'fav_on' : 'fav_off', newFav ? '已收藏' : '取消收藏', 'ok');
     render();
-  } catch { toast('更新失敗', 'error'); }
+  } catch { cuteToast('error', '更新失敗', 'error'); }
 });
 
 // slideshow
 function startSlideshow() {
   if (state.slideshowTimer) return;
   lbSlideshow.classList.add('playing');
+  lb.classList.add('playing');
   lbSlideshow.textContent = '⏸';
-  state.slideshowTimer = setInterval(() => lbStep(1), 3500);
+  state.slideshowTimer = setInterval(() => lbStep(1), SLIDESHOW_MS);
 }
 function stopSlideshow() {
   if (!state.slideshowTimer) return;
   clearInterval(state.slideshowTimer);
   state.slideshowTimer = null;
   lbSlideshow.classList.remove('playing');
+  lb.classList.remove('playing');
   lbSlideshow.textContent = '▶';
 }
 lbSlideshow.addEventListener('click', () => {
