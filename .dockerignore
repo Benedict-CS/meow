@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+.git
+.gitignore
+data
+uploads
+thumbs
+meta.json
+.DS_Store
+Dockerfile
+docker-compose.yml
+.dockerignore

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#fef6ec" />
+  <title>🐾 貓貓相簿 · My Cat Album</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Kalam:wght@400;700&display=swap" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="貓貓相簿" />
+  <meta name="mobile-web-app-capable" content="yes" />
+</head>
+<body>
+  <header class="hero">
+    <h1>🐾 貓貓相簿</h1>
+    <p class="subtitle">收集每一個喵喵瞬間</p>
+  </header>
+
+  <main>
+    <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
+
+    <button class="fab-upload" id="fab-upload" title="上傳照片/影片" aria-label="上傳">
+      <span class="fab-plus">＋</span>
+      <span class="fab-label">上傳</span>
+    </button>
+
+    <section class="toolbar">
+      <div class="counter">
+        <span id="count">0</span> / <span id="total-count">0</span> 個檔案
+      </div>
+
+      <div class="search">
+        <input type="search" id="search" placeholder="🔍 搜尋檔名、描述、標籤…" />
+      </div>
+
+      <div class="filter" id="filter-chips">
+        <button class="chip active" data-filter="all">全部</button>
+        <button class="chip" data-filter="image">📷 照片</button>
+        <button class="chip" data-filter="video">🎬 影片</button>
+        <button class="chip" data-filter="favorite">❤️ 最愛</button>
+      </div>
+
+      <div class="actions">
+        <button class="btn-ghost" id="select-mode-btn" title="多選">☑️ 多選</button>
+      </div>
+    </section>
+
+    <section id="tag-bar" class="tag-bar" hidden></section>
+
+    <section id="select-bar" class="select-bar" hidden>
+      <span id="select-count">已選 0 個</span>
+      <div class="select-actions">
+        <button class="btn-ghost" id="select-all-btn">全選</button>
+        <button class="btn-ghost" id="batch-fav-btn">❤️ 最愛</button>
+        <button class="btn-ghost" id="batch-tag-btn"># 加標籤</button>
+        <button class="btn-danger" id="batch-delete-btn">🗑 刪除</button>
+        <button class="btn-ghost" id="select-cancel-btn">取消</button>
+      </div>
+    </section>
+
+    <datalist id="all-tags"></datalist>
+
+    <section id="gallery" class="gallery">
+      <div class="empty-state" id="empty-state">
+        <div class="empty-emoji">🐱</div>
+        <div class="empty-text">還沒有照片，上傳第一張喵喵照吧～</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="upload-modal" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="upload-modal-close" aria-label="關閉">✕</button>
+      <h2 class="modal-title">📸 上傳照片 / 影片</h2>
+      <div class="drop-zone" id="drop-zone">
+        <div class="drop-icon">🐱</div>
+        <div class="drop-title">把檔案拖到這裡</div>
+        <div class="drop-hint">或 <button class="link-btn" id="browse-btn" type="button">點這裡選檔案</button></div>
+        <div class="drop-formats">JPG / PNG / GIF / WEBP / MP4 / WEBM / MOV · 一次可選多張 · 最多 500 MB</div>
+      </div>
+      <div id="upload-list" class="upload-list" hidden></div>
+    </div>
+  </div>
+
+  <div id="lightbox" class="lightbox" hidden>
+    <button class="lb-close" aria-label="關閉，回到相簿"><span>✕</span><span class="lb-close-txt">回到相簿</span></button>
+    <button class="lb-prev" aria-label="上一張">‹</button>
+    <button class="lb-next" aria-label="下一張">›</button>
+    <button class="lb-slideshow" id="lb-slideshow" aria-label="播放投影片">▶</button>
+    <button class="lb-fav" id="lb-fav" aria-label="收藏">♡</button>
+    <div class="lb-content" id="lb-content"></div>
+    <div class="lb-meta">
+      <div class="lb-caption-area" id="lb-caption-area">
+        <div class="lb-caption-text" id="lb-caption-display"></div>
+        <textarea id="lb-caption-edit" placeholder="寫一句描述…  (Ctrl+Enter 儲存，Esc 取消)" maxlength="500" hidden></textarea>
+        <div class="lb-caption-actions" id="lb-caption-actions" hidden>
+          <button type="button" class="lb-btn-cancel" id="lb-caption-cancel">取消</button>
+          <button type="button" class="lb-btn-save" id="lb-caption-save">✓ 儲存</button>
+        </div>
+      </div>
+      <div class="lb-tags" id="lb-tags"></div>
+      <div class="lb-date" id="lb-date"></div>
+      <input type="datetime-local" id="lb-date-edit" hidden />
+    </div>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

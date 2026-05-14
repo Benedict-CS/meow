@@ -1,0 +1,13 @@
+services:
+  cat-gallery:
+    build: .
+    image: cat-gallery:latest
+    container_name: cat-gallery
+    # Run as host user (1000:1000) so files in ./data stay owned by you, not root.
+    # Override with CAT_UID/CAT_GID env vars on machines where you aren't 1000.
+    user: "${CAT_UID:-1000}:${CAT_GID:-1000}"
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

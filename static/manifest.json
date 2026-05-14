@@ -1,0 +1,18 @@
+{
+  "name": "貓貓相簿",
+  "short_name": "貓貓",
+  "description": "收集每一個喵喵瞬間",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fef6ec",
+  "theme_color": "#fef6ec",
+  "lang": "zh-Hant",
+  "icons": [
+    { "src": "/static/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" },
+    { "src": "/static/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
+    { "src": "/static/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
+    { "src": "/static/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}

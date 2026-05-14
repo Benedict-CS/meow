@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#ffe7d3"/>
+      <stop offset="100%" stop-color="#fbe9d6"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g fill="#d9886b">
+    <!-- ears -->
+    <path d="M152 168 L120 92 L208 132 Z"/>
+    <path d="M360 168 L392 92 L304 132 Z"/>
+    <!-- face -->
+    <ellipse cx="256" cy="270" rx="140" ry="120"/>
+  </g>
+  <g fill="#3d2f25">
+    <circle cx="208" cy="252" r="14"/>
+    <circle cx="304" cy="252" r="14"/>
+  </g>
+  <!-- nose -->
+  <path d="M244 296 L268 296 L256 312 Z" fill="#ec5e6b"/>
+  <!-- mouth -->
+  <path d="M256 312 Q244 332 226 322 M256 312 Q268 332 286 322" stroke="#3d2f25" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- whiskers -->
+  <g stroke="#3d2f25" stroke-width="4" stroke-linecap="round">
+    <line x1="160" y1="296" x2="100" y2="288"/>
+    <line x1="160" y1="312" x2="100" y2="318"/>
+    <line x1="352" y1="296" x2="412" y2="288"/>
+    <line x1="352" y1="312" x2="412" y2="318"/>
+  </g>
+  <!-- paw print accent -->
+  <g fill="#b76a4f" opacity="0.5">
+    <circle cx="384" cy="416" r="14"/>
+    <circle cx="408" cy="396" r="10"/>
+    <circle cx="432" cy="416" r="10"/>
+    <circle cx="396" cy="440" r="18"/>
+  </g>
+</svg>
