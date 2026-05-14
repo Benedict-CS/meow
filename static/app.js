@@ -743,6 +743,45 @@ lbFav.addEventListener('click', async () => {
   } catch { cuteToast('error', '更新失敗', 'error'); }
 });
 
+// ---------- Download / Share ----------
+const lbDownload = $('#lb-download');
+async function downloadOrShare() {
+  const it = currentLbItem();
+  if (!it || lbDownload.classList.contains('busy')) return;
+  lbDownload.classList.add('busy');
+  try {
+    // Try Web Share API with the actual file first — on iOS this opens
+    // the native share sheet ("Save to Photos" / "Save to Files" / AirDrop).
+    if (navigator.canShare) {
+      try {
+        const r = await fetch(it.url);
+        if (r.ok) {
+          const blob = await r.blob();
+          const file = new File([blob], it.name, { type: blob.type || 'application/octet-stream' });
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: it.caption || it.name });
+            return;
+          }
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;  // user cancelled
+        // fall through to direct download
+      }
+    }
+    // Fallback: plain <a download> — works on desktop browsers + Android.
+    const a = document.createElement('a');
+    a.href = it.url;
+    a.download = it.name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    toast('開始下載 ⤓');
+  } finally {
+    lbDownload.classList.remove('busy');
+  }
+}
+lbDownload.addEventListener('click', (e) => { e.stopPropagation(); downloadOrShare(); });
+
 // slideshow
 function startSlideshow() {
   if (state.slideshowTimer) return;
@@ -780,6 +819,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') lbStep(1);
   else if (e.key === ' ') { e.preventDefault(); if (state.slideshowTimer) stopSlideshow(); else startSlideshow(); }
   else if (e.key === 'f' || e.key === 'F') lbFav.click();
+  else if (e.key === 'd' || e.key === 'D') lbDownload.click();
 });
 
 // ---------- Batch meta (favorite / tag) ----------

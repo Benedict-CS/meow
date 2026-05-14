@@ -80,6 +80,7 @@ python3 -m venv .venv
 | `←` / `→`        | Previous / next photo                 |
 | `Space`          | Toggle slideshow                      |
 | `F`              | Toggle favorite                       |
+| `D`              | Download / share current item         |
 | `Esc`            | Close                                 |
 | Swipe left/right | Previous / next                       |
 | Swipe down       | Close                                 |
