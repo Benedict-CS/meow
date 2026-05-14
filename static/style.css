@@ -65,6 +65,26 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   display: inline-block;
 }
 
+/* Tiny corner shortcut into /disk — discoverable but doesn't compete with the title */
+.hero-corner {
+  position: absolute;
+  top: 22px;
+  right: 22px;
+  font-size: 1.2rem;
+  text-decoration: none;
+  opacity: .55;
+  padding: 6px 9px;
+  border-radius: 50%;
+  background: var(--card);
+  border: 1px solid #f0dec8;
+  box-shadow: var(--shadow);
+  transition: opacity .15s, transform .15s;
+}
+.hero-corner:hover { opacity: 1; transform: rotate(-8deg) scale(1.1); }
+@media (max-width: 500px) {
+  .hero-corner { top: 14px; right: 14px; font-size: 1rem; padding: 5px 8px; }
+}
+
 /* ===== Uploader ===== */
 .uploader { margin-bottom: 24px; }
 .drop-zone {

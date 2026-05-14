@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>📊 容量 · 貓貓相簿</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Kalam:wght@400;700&display=swap" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/disk.css" />
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+  <meta name="theme-color" content="#fef6ec" />
+</head>
+<body>
+  <header class="hero">
+    <h1>📊 容量</h1>
+    <p class="subtitle">看看相簿吃了多少</p>
+  </header>
+
+  <main class="disk-main">
+    <a class="back-link" href="/">← 回相簿</a>
+    <div id="stats" class="stats-grid">
+      <div class="loading">🐾 載入中…</div>
+    </div>
+    <p class="footnote" id="updated"></p>
+  </main>
+
+  <script src="/static/disk.js"></script>
+</body>
+</html>

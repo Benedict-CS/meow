@@ -19,6 +19,7 @@ import mimetypes
 import os
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -427,6 +428,43 @@ def ensure_thumb(filename: str) -> bool:
     return make_image_thumb(src, tp)
 
 
+# ---------- Stats (for /disk page) ----------
+def gather_stats() -> dict:
+    """Snapshot of file counts + disk usage. Cheap enough to run per-request."""
+    images = videos = 0
+    upload_bytes = 0
+    for p in UPLOAD_DIR.iterdir():
+        if not p.is_file() or p.name.startswith("."):
+            continue
+        sz = p.stat().st_size
+        upload_bytes += sz
+        if p.suffix.lower() in VIDEO_EXT:
+            videos += 1
+        else:
+            images += 1
+    thumb_bytes = sum(p.stat().st_size for p in THUMB_DIR.iterdir() if p.is_file())
+    meta_bytes = META_PATH.stat().st_size if META_PATH.is_file() else 0
+    total = images + videos
+    usage = shutil.disk_usage(DATA_DIR)
+    avg = upload_bytes // total if total else 0
+    return {
+        "files": {"total": total, "image": images, "video": videos},
+        "bytes": {
+            "uploads": upload_bytes,
+            "thumbs": thumb_bytes,
+            "meta": meta_bytes,
+            "total": upload_bytes + thumb_bytes + meta_bytes,
+        },
+        "avg_upload_bytes": avg,
+        "host_disk": {
+            "total": usage.total,
+            "used":  usage.used,
+            "free":  usage.free,
+        },
+        "data_dir": str(DATA_DIR),
+    }
+
+
 # ---------- Listing ----------
 def list_uploads():
     meta = load_meta()["files"]
@@ -562,6 +600,9 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             return self._send_file(STATIC_DIR / "index.html", cache=False)
 
+        if path == "/disk":
+            return self._send_file(STATIC_DIR / "disk.html", cache=False)
+
         # PWA: service worker must be served from the site root so its scope
         # covers /api, /uploads etc. Manifest can live anywhere.
         if path == "/sw.js":
@@ -571,6 +612,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/list":
             return self._send_json(200, {"items": list_uploads()})
+        if path == "/api/stats":
+            return self._send_json(200, gather_stats())
 
         for prefix, base, cache in (
             ("/static/", STATIC_DIR, False),   # no cache so CSS/JS edits show up immediately
