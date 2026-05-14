@@ -2,6 +2,17 @@
 
 A scrapbook-style photo & video album for the cats in your life — pure-Python HTTP server, vanilla-JS frontend, automatic iPhone format conversion built in.
 
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Pillow](https://img.shields.io/badge/Pillow-12-9B59B6)](https://python-pillow.org/)
+[![pillow-heif](https://img.shields.io/badge/HEIC-pillow--heif-FF6B6B)](https://github.com/bigcat88/pillow_heif)
+[![ffmpeg](https://img.shields.io/badge/ffmpeg-HEVC%20%E2%86%92%20H.264-007808?logo=ffmpeg&logoColor=white)](https://ffmpeg.org/)
+[![Vanilla JS](https://img.shields.io/badge/Vanilla_JS-no_build_step-F7DF1E?logo=javascript&logoColor=black)](https://developer.mozilla.org/docs/Web/JavaScript)
+[![CSS3](https://img.shields.io/badge/CSS3-1572B6?logo=css3&logoColor=white)](https://developer.mozilla.org/docs/Web/CSS)
+[![PWA](https://img.shields.io/badge/PWA-installable-5A0FC8?logo=pwa&logoColor=white)](https://web.dev/progressive-web-apps/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen)](#)
+[![Self-hosted](https://img.shields.io/badge/Self--hosted-LAN-orange)](#)
+
 > Personal / home-scale tool. **No authentication** — designed to live on `localhost` or a private LAN (Tailscale / VPN). If you expose it publicly, put it behind a reverse proxy with auth.
 
 ---
@@ -160,6 +171,29 @@ Daily cron example:
 **Android (Chrome)** — will prompt with an "Install app" banner automatically.
 
 ---
+
+## Tech stack
+
+**Backend**
+
+- **Python 3.12+**, standard library only — `http.server`, `threading`, `queue`, no framework
+- **[Pillow](https://python-pillow.org/) 12** — image decode/encode, EXIF parsing, thumbnail generation
+- **[pillow-heif](https://github.com/bigcat88/pillow_heif)** — HEIC/HEIF decode (ships its own libheif in the manylinux wheel, no apt install needed)
+- **[ffmpeg](https://ffmpeg.org/)** — HEVC `.mov` / `.mp4` → H.264 MP4, video keyframe extraction for thumbs
+
+**Frontend**
+
+- **Vanilla JavaScript (ES2020+)** — no framework, no build step, no `npm`
+- **Plain CSS** with custom properties, mobile-first responsive
+- **Service Worker + Web App Manifest** for PWA install on iOS/Android
+- **`<datalist>`** for tag autocomplete, **HTTP Range** for video seek, **`hashchange`** for state sync
+
+**Infrastructure**
+
+- **Docker** (`python:3.12-slim` + ffmpeg) — single-image deploy
+- **docker compose** orchestration with bind-mounted `./data/` volume
+- **Plain JSON** metadata store — no database, hand-editable, version-control friendly
+- **SHA-1 content hash** for upload de-dup
 
 ## Design notes
 
