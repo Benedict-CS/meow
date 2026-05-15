@@ -81,8 +81,10 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   transition: opacity .15s, transform .15s;
 }
 .hero-corner:hover { opacity: 1; transform: rotate(-8deg) scale(1.1); }
+.hero-corner-2 { right: 70px; }
 @media (max-width: 500px) {
-  .hero-corner { top: 14px; right: 14px; font-size: 1rem; padding: 5px 8px; }
+  .hero-corner    { top: 14px; right: 14px; font-size: 1rem; padding: 5px 8px; }
+  .hero-corner-2  { right: 56px; }
 }
 
 /* ===== Uploader ===== */

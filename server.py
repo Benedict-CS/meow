@@ -25,7 +25,7 @@ import sys
 import threading
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import unquote, urlparse, parse_qs
@@ -51,9 +51,13 @@ STATIC_DIR = ROOT / "static"
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(ROOT))).resolve()
 UPLOAD_DIR = DATA_DIR / "uploads"
 THUMB_DIR = DATA_DIR / "thumbs"
+TRASH_UPLOAD_DIR = DATA_DIR / "trash" / "uploads"
+TRASH_THUMB_DIR = DATA_DIR / "trash" / "thumbs"
 META_PATH = DATA_DIR / "meta.json"
-for d in (UPLOAD_DIR, THUMB_DIR):
+for d in (UPLOAD_DIR, THUMB_DIR, TRASH_UPLOAD_DIR, TRASH_THUMB_DIR):
     d.mkdir(parents=True, exist_ok=True)
+
+TRASH_TTL_DAYS = 30
 
 IMAGE_EXT = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".heic", ".heif"}
 VIDEO_EXT = {".mp4", ".webm", ".mov", ".m4v", ".ogg", ".ogv"}
@@ -80,7 +84,7 @@ _jobs: "queue.Queue[str]" = queue.Queue()
 
 # ---------- Metadata store ----------
 def _empty_meta():
-    return {"files": {}, "notes": {}}
+    return {"files": {}, "notes": {}, "trash": {}}
 
 
 def load_meta() -> dict:
@@ -93,6 +97,8 @@ def load_meta() -> dict:
             data["files"] = {}
         if "notes" not in data:
             data["notes"] = {}
+        if "trash" not in data:
+            data["trash"] = {}
         return data
     except Exception:
         return _empty_meta()
@@ -177,6 +183,7 @@ def update_note(nid: str, patch: dict):
 
 
 def delete_note(nid: str) -> bool:
+    """Hard-delete a note (legacy / internal). For user-facing delete, use trash_note."""
     with _meta_lock:
         data = load_meta()
         if nid in data["notes"]:
@@ -184,6 +191,117 @@ def delete_note(nid: str) -> bool:
             save_meta(data)
             return True
         return False
+
+
+# ---------- Trash (soft delete with 30-day retention) ----------
+def trash_file(name: str) -> bool:
+    """Move a photo/video from uploads to trash. Stash its meta + move thumb."""
+    src = UPLOAD_DIR / name
+    if not src.is_file():
+        return False
+    dst = TRASH_UPLOAD_DIR / name
+    if dst.exists():
+        dst.unlink()
+    src.rename(dst)
+    thumb_src = thumb_path(name)
+    thumb_dst = TRASH_THUMB_DIR / (Path(name).stem + ".jpg")
+    if thumb_src.is_file():
+        if thumb_dst.exists():
+            thumb_dst.unlink()
+        thumb_src.rename(thumb_dst)
+    with _meta_lock:
+        data = load_meta()
+        rec = data["files"].pop(name, {})
+        data.setdefault("trash", {})[name] = {
+            "kind": "file",
+            "deleted_at": datetime.now().isoformat(timespec="seconds"),
+            "original": rec,
+        }
+        save_meta(data)
+    # Free the hash so re-uploading the same content doesn't get bounced as duplicate
+    _hash_unregister(rec.get("hash", ""))
+    return True
+
+
+def trash_note(nid: str) -> bool:
+    with _meta_lock:
+        data = load_meta()
+        if nid not in data["notes"]:
+            return False
+        rec = data["notes"].pop(nid)
+        data.setdefault("trash", {})[nid] = {
+            "kind": "note",
+            "deleted_at": datetime.now().isoformat(timespec="seconds"),
+            "original": rec,
+        }
+        save_meta(data)
+    return True
+
+
+def restore_from_trash(name: str) -> bool:
+    with _meta_lock:
+        data = load_meta()
+        trash = data.get("trash", {})
+        entry = trash.pop(name, None)
+        if entry is None:
+            return False
+        if entry["kind"] == "file":
+            src = TRASH_UPLOAD_DIR / name
+            if not src.is_file():
+                return False
+            dst = UPLOAD_DIR / name
+            src.rename(dst)
+            thumb_src = TRASH_THUMB_DIR / (Path(name).stem + ".jpg")
+            thumb_dst = thumb_path(name)
+            if thumb_src.is_file():
+                thumb_src.rename(thumb_dst)
+            data["files"][name] = entry["original"]
+            h = entry["original"].get("hash", "")
+            if h:
+                _hash_index[h] = name  # caller already holds _meta_lock; using internal dict directly is fine
+        else:
+            data["notes"][name] = entry["original"]
+        save_meta(data)
+    return True
+
+
+def permanently_delete(name: str) -> bool:
+    """Remove from trash forever — unlinks file + thumb, drops trash entry."""
+    with _meta_lock:
+        data = load_meta()
+        entry = data.get("trash", {}).pop(name, None)
+        save_meta(data)
+    if entry is None:
+        return False
+    if entry["kind"] == "file":
+        f = TRASH_UPLOAD_DIR / name
+        if f.is_file():
+            try: f.unlink()
+            except Exception: pass
+        t = TRASH_THUMB_DIR / (Path(name).stem + ".jpg")
+        if t.is_file():
+            try: t.unlink()
+            except Exception: pass
+    return True
+
+
+def purge_old_trash():
+    """Run at startup: hard-delete trash entries older than TRASH_TTL_DAYS."""
+    cutoff = datetime.now() - timedelta(days=TRASH_TTL_DAYS)
+    data = load_meta()
+    trash = data.get("trash", {})
+    to_purge = []
+    for name, entry in trash.items():
+        try:
+            deleted_at = datetime.fromisoformat(entry.get("deleted_at", ""))
+            if deleted_at < cutoff:
+                to_purge.append(name)
+        except ValueError:
+            continue
+    for name in to_purge:
+        permanently_delete(name)
+    if to_purge:
+        sys.stderr.write(f"[trash] purged {len(to_purge)} item(s) older than {TRASH_TTL_DAYS} days\n")
 
 
 _NOTE_ID_RE = re.compile(r"^n-\d{8}-\d{6}-[0-9a-f]{6}$")
@@ -720,6 +838,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/disk":
             return self._send_file(STATIC_DIR / "disk.html", cache=False)
+        if path == "/trash":
+            return self._send_file(STATIC_DIR / "trash.html", cache=False)
 
         # PWA: service worker must be served from the site root so its scope
         # covers /api, /uploads etc. Manifest can live anywhere.
@@ -732,11 +852,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json(200, {"items": list_uploads()})
         if path == "/api/stats":
             return self._send_json(200, gather_stats())
+        if path == "/api/trash":
+            return self._handle_get_trash()
 
         for prefix, base, cache in (
             ("/static/", STATIC_DIR, False),   # no cache so CSS/JS edits show up immediately
             ("/uploads/", UPLOAD_DIR, True),
             ("/thumbs/", THUMB_DIR, True),
+            ("/trash-files/", TRASH_UPLOAD_DIR, False),
+            ("/trash-thumbs/", TRASH_THUMB_DIR, False),
         ):
             if path.startswith(prefix):
                 rel = path[len(prefix):]
@@ -759,6 +883,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_batch_meta()
         if path == "/api/note":
             return self._handle_note_create()
+        if path == "/api/restore":
+            return self._handle_restore()
 
         self.send_error(404, "Not Found")
 
@@ -808,6 +934,8 @@ class Handler(BaseHTTPRequestHandler):
         path = unquote(parsed.path)
         if path == "/api/note":
             return self._handle_note_delete()
+        if path == "/api/trash":
+            return self._handle_trash_delete()
         if path != "/api/delete":
             return self.send_error(404, "Not Found")
         params = parse_qs(parsed.query)
@@ -827,18 +955,9 @@ class Handler(BaseHTTPRequestHandler):
         return UPLOAD_DIR in target.parents
 
     def _delete_one(self, name: str) -> bool:
-        target = UPLOAD_DIR / name
-        if not target.is_file():
-            return False
-        # drop hash from dedup index before removing meta
-        rec = load_meta()["files"].get(name, {})
-        _hash_unregister(rec.get("hash", ""))
-        target.unlink()
-        tp = thumb_path(name)
-        if tp.is_file():
-            tp.unlink()
-        remove_meta(name)
-        return True
+        """Soft-delete: move file + thumb to trash, stash meta. 30-day retention.
+        Use ?hard=true on /api/delete to permanently delete (skip trash)."""
+        return trash_file(name)
 
     def _handle_upload(self):
         ctype = self.headers.get("Content-Type", "")
@@ -938,6 +1057,68 @@ class Handler(BaseHTTPRequestHandler):
 
         return self._send_json(200, {"saved": saved, "errors": errors})
 
+    def _handle_get_trash(self):
+        data = load_meta()
+        trash = data.get("trash", {})
+        items = []
+        now = datetime.now()
+        for name, entry in trash.items():
+            try:
+                deleted_at = datetime.fromisoformat(entry.get("deleted_at", ""))
+                days_left = max(0, TRASH_TTL_DAYS - (now - deleted_at).days)
+            except ValueError:
+                days_left = TRASH_TTL_DAYS
+            item = {
+                "name": name,
+                "kind": entry["kind"],
+                "deleted_at": entry.get("deleted_at"),
+                "days_left": days_left,
+            }
+            orig = entry.get("original", {})
+            if entry["kind"] == "file":
+                item["url"] = f"/trash-files/{name}"
+                item["thumb_url"] = f"/trash-thumbs/{Path(name).stem}.jpg"
+                item["caption"] = orig.get("caption", "")
+                item["tags"] = orig.get("tags", [])
+                item["captured_at"] = orig.get("captured_at")
+                item["kind_inner"] = "video" if Path(name).suffix.lower() in VIDEO_EXT else "image"
+            else:
+                item["text"] = orig.get("text", "")
+                item["tags"] = orig.get("tags", [])
+                item["captured_at"] = orig.get("captured_at")
+            items.append(item)
+        items.sort(key=lambda x: x.get("deleted_at") or "", reverse=True)
+        return self._send_json(200, {"items": items, "ttl_days": TRASH_TTL_DAYS})
+
+    def _handle_restore(self):
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        name = (params.get("file") or [""])[0]
+        if not name:
+            return self._send_json(400, {"error": "missing file param"})
+        if not restore_from_trash(name):
+            return self._send_json(404, {"error": "not found in trash"})
+        return self._send_json(200, {"restored": name})
+
+    def _handle_trash_delete(self):
+        """DELETE /api/trash?file=<name>  → permanently delete one
+           DELETE /api/trash             → empty entire trash"""
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        name = (params.get("file") or [""])[0]
+        if name:
+            if permanently_delete(name):
+                return self._send_json(200, {"deleted": name})
+            return self._send_json(404, {"error": "not found"})
+        # Empty all
+        data = load_meta()
+        names = list(data.get("trash", {}).keys())
+        count = 0
+        for n in names:
+            if permanently_delete(n):
+                count += 1
+        return self._send_json(200, {"deleted_count": count})
+
     def _handle_note_create(self):
         body = self._read_body()
         if body is None:
@@ -986,7 +1167,8 @@ class Handler(BaseHTTPRequestHandler):
         nid = (params.get("id") or [""])[0]
         if not _is_note_id(nid):
             return self._send_json(400, {"error": "invalid id"})
-        if not delete_note(nid):
+        # Soft delete — goes to trash for 30 days
+        if not trash_note(nid):
             return self._send_json(404, {"error": "not found"})
         return self._send_json(200, {"deleted": nid})
 
@@ -1083,9 +1265,9 @@ class Handler(BaseHTTPRequestHandler):
         deleted, missing = [], []
         for name in files:
             name = str(name)
-            # Note IDs go through delete_note; filenames through _delete_one.
+            # Note IDs go through trash_note; filenames through trash_file.
             if _is_note_id(name):
-                if delete_note(name):
+                if trash_note(name):
                     deleted.append(name)
                 else:
                     missing.append(name)
@@ -1093,7 +1275,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self._validate_filename(name):
                 missing.append(name)
                 continue
-            if self._delete_one(name):
+            if trash_file(name):
                 deleted.append(name)
             else:
                 missing.append(name)
@@ -1213,6 +1395,7 @@ def main():
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     backfill_existing()
+    purge_old_trash()
     _rebuild_hash_index()
     # Hash backfill runs in background — first request can hit server within
     # ~50ms even if there are thousands of un-hashed files to chew through.

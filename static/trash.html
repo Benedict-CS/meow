@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>🗑 垃圾桶 · 貓貓相簿</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Kalam:wght@400;700&display=swap" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/trash.css" />
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
+  <meta name="theme-color" content="#fef6ec" />
+</head>
+<body>
+  <header class="hero">
+    <h1>🗑 垃圾桶</h1>
+    <p class="subtitle" id="ttl-line">30 天後自動永久消失</p>
+  </header>
+
+  <main class="trash-main">
+    <a class="back-link" href="/">← 回相簿</a>
+    <div class="trash-toolbar" id="trash-toolbar" hidden>
+      <span id="trash-count"></span>
+      <button class="btn-danger" id="empty-all">🔥 清空垃圾桶</button>
+    </div>
+    <div id="trash-list" class="trash-list">
+      <div class="loading">🐾 載入中…</div>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/static/trash.js"></script>
+</body>
+</html>
