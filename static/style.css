@@ -265,7 +265,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   color: white;
 }
 
-.actions { display: flex; gap: 8px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .btn-ghost, .btn-danger {
   border-radius: 999px; padding: 6px 14px;
   font: inherit; font-size: .85rem;
@@ -312,7 +312,17 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 .select-bar #select-count { font-weight: 600; color: var(--primary-dark); }
 .select-actions { display: flex; gap: 8px; }
 body.select-mode .item { cursor: pointer; }
-body.select-mode .delete-btn { display: none; }
+/* During select mode, the per-item action buttons (fav / delete) would
+   collide visually with the select checkbox at top-right. Hide both. */
+body.select-mode .delete-btn,
+body.select-mode .fav-btn { display: none; }
+/* Sticky select bar so batch buttons stay reachable while scrolling. */
+body.select-mode .select-bar {
+  position: sticky;
+  top: 0;
+  z-index: 12;
+  box-shadow: 0 6px 20px rgba(80, 50, 30, 0.16);
+}
 
 /* ===== Month section (scrapbook page-title style) ===== */
 .month-header {

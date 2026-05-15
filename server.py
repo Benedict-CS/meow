@@ -1022,14 +1022,34 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 return self._send_json(400, {"error": "bad captured_at"})
 
+        # Batch ops support both photo files AND note IDs. Caption only makes
+        # sense for files (notes have a 'text' field instead).
         updated, missing = [], []
-        for name in files:
-            name = str(name)
-            if not self._validate_filename(name):
-                missing.append(name)
-                continue
-            with _meta_lock:
-                data = load_meta()
+        with _meta_lock:
+            data = load_meta()
+            for name in files:
+                name = str(name)
+                if _is_note_id(name) and name in data["notes"]:
+                    rec = data["notes"][name]
+                    for k, v in base_patch.items():
+                        if k == "caption":
+                            continue  # notes don't have caption
+                        rec[k] = v
+                    if tags_add or tags_remove:
+                        cur = list(rec.get("tags", []))
+                        if tags_remove:
+                            cur = [t for t in cur if t not in tags_remove]
+                        if tags_add:
+                            for t in tags_add:
+                                if t and t not in cur:
+                                    cur.append(t)
+                        rec["tags"] = cur[:20]
+                    data["notes"][name] = rec
+                    updated.append(name)
+                    continue
+                if not self._validate_filename(name):
+                    missing.append(name)
+                    continue
                 rec = data["files"].get(name)
                 if rec is None:
                     missing.append(name)
@@ -1045,8 +1065,8 @@ class Handler(BaseHTTPRequestHandler):
                                 cur.append(t)
                     rec["tags"] = cur[:20]
                 data["files"][name] = rec
-                save_meta(data)
-            updated.append(name)
+                updated.append(name)
+            save_meta(data)
         return self._send_json(200, {"updated": updated, "missing": missing})
 
     def _handle_batch_delete(self):
@@ -1063,6 +1083,13 @@ class Handler(BaseHTTPRequestHandler):
         deleted, missing = [], []
         for name in files:
             name = str(name)
+            # Note IDs go through delete_note; filenames through _delete_one.
+            if _is_note_id(name):
+                if delete_note(name):
+                    deleted.append(name)
+                else:
+                    missing.append(name)
+                continue
             if not self._validate_filename(name):
                 missing.append(name)
                 continue

@@ -457,7 +457,13 @@ function renderNote(note, idx) {
   });
   node.appendChild(del);
 
-  node.addEventListener('click', () => openNoteEditor(note));
+  node.addEventListener('click', () => {
+    if (state.selectMode) {
+      toggleSelect(note.id, node);
+    } else {
+      openNoteEditor(note);
+    }
+  });
   return node;
 }
 
@@ -909,9 +915,20 @@ function makeTagInput(it) {
 function lbStep(d) {
   const items = visibleItems();
   if (!items.length) return;
-  state.lbIndex = (state.lbIndex + d + items.length) % items.length;
-  showLb();
-  syncStateToUrl();
+  // Skip past notes — they aren't visual, so navigating to one would
+  // pop the lightbox and open the editor mid-slideshow.
+  let next = state.lbIndex;
+  for (let i = 0; i < items.length; i++) {
+    next = (next + d + items.length) % items.length;
+    if (items[next].kind !== 'note') {
+      state.lbIndex = next;
+      showLb();
+      syncStateToUrl();
+      return;
+    }
+  }
+  // All visible items are notes — nothing to show.
+  closeLightbox();
 }
 
 // favorite from lightbox
