@@ -28,10 +28,19 @@
   <main>
     <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
 
-    <button class="fab-upload" id="fab-upload" title="上傳照片/影片" aria-label="上傳">
-      <span class="fab-plus">＋</span>
-      <span class="fab-label">上傳</span>
-    </button>
+    <div class="fab-dial" id="fab-dial">
+      <button class="fab-action" id="fab-action-note" type="button">
+        <span class="fab-action-icon">📝</span>
+        <span>寫筆記</span>
+      </button>
+      <button class="fab-action" id="fab-action-upload" type="button">
+        <span class="fab-action-icon">📷</span>
+        <span>上傳照片</span>
+      </button>
+      <button class="fab-upload" id="fab-upload" title="新增" aria-label="新增" aria-expanded="false">
+        <span class="fab-plus">＋</span>
+      </button>
+    </div>
 
     <section class="toolbar">
       <div class="counter">
@@ -51,7 +60,6 @@
       </div>
 
       <div class="actions">
-        <button class="btn-ghost" id="new-note-btn" title="寫個只有文字的紀錄">📝 寫筆記</button>
         <button class="btn-ghost" id="select-mode-btn" title="多選">☑️ 多選</button>
       </div>
     </section>

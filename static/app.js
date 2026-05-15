@@ -498,7 +498,44 @@ function closeUploadModal() {
 
 $('#browse-btn').addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
 dropZone.addEventListener('click', () => fileInput.click());
-$('#fab-upload').addEventListener('click', openUploadModal);
+
+// ---------- FAB speed-dial (＋ → 📷 上傳 / 📝 寫筆記) ----------
+const fabDial = $('#fab-dial');
+const fabMain = $('#fab-upload');
+let fabBackdrop = null;
+
+function openFabDial() {
+  fabDial.classList.add('open');
+  fabMain.setAttribute('aria-expanded', 'true');
+  if (!fabBackdrop) {
+    fabBackdrop = document.createElement('div');
+    fabBackdrop.className = 'fab-backdrop';
+    fabBackdrop.addEventListener('click', closeFabDial);
+    document.body.appendChild(fabBackdrop);
+  }
+  requestAnimationFrame(() => fabBackdrop.classList.add('show'));
+}
+function closeFabDial() {
+  fabDial.classList.remove('open');
+  fabMain.setAttribute('aria-expanded', 'false');
+  if (fabBackdrop) fabBackdrop.classList.remove('show');
+}
+fabMain.addEventListener('click', (e) => {
+  e.stopPropagation();
+  fabDial.classList.contains('open') ? closeFabDial() : openFabDial();
+});
+$('#fab-action-upload').addEventListener('click', () => {
+  closeFabDial();
+  openUploadModal();
+});
+$('#fab-action-note').addEventListener('click', () => {
+  closeFabDial();
+  openNoteEditor(null);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && fabDial.classList.contains('open')) closeFabDial();
+});
+
 $('#upload-modal-close').addEventListener('click', closeUploadModal);
 uploadModal.addEventListener('click', (e) => {
   if (e.target === uploadModal) closeUploadModal();
@@ -636,7 +673,7 @@ function parseTagsInput(s) {
   return s.split(/[,，]/).map(t => t.trim()).filter(Boolean);
 }
 
-$('#new-note-btn').addEventListener('click', () => openNoteEditor(null));
+// (FAB speed-dial opens the note editor via the 📝 寫筆記 action — see above.)
 $('#note-modal-close').addEventListener('click', closeNoteEditor);
 $('#note-cancel').addEventListener('click', closeNoteEditor);
 noteModal.addEventListener('click', (e) => { if (e.target === noteModal) closeNoteEditor(); });

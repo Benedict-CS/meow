@@ -115,35 +115,103 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 .drop-hint { margin-top: 10px; color: var(--ink); font-size: 1rem; }
 .drop-formats { margin-top: 14px; font-size: .8rem; color: var(--ink-faint); }
 
-/* Floating upload button — always visible */
-.fab-upload {
+/* Floating "新增" speed-dial — tap to expand into 📷 上傳 / 📝 寫筆記 */
+.fab-dial {
   position: fixed;
-  right: 28px; bottom: 28px;
-  height: 56px;
-  padding: 0 22px 0 18px;
-  border-radius: 999px;
+  right: 28px;
+  bottom: 28px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-end;
+  gap: 12px;
+  pointer-events: none;        /* let children handle clicks */
+}
+.fab-dial > * { pointer-events: auto; }
+
+.fab-upload {
+  width: 56px; height: 56px;
+  padding: 0;
+  border-radius: 50%;
   background: var(--primary);
   color: white;
   border: none;
   cursor: pointer;
   box-shadow: 0 8px 24px rgba(217, 136, 107, 0.45);
-  z-index: 50;
-  transition: transform .15s, background .15s, box-shadow .15s;
-  display: inline-flex; align-items: center; gap: 8px;
+  transition: transform .2s ease, background .15s, box-shadow .15s;
+  display: flex; align-items: center; justify-content: center;
   font: inherit;
 }
-.fab-upload .fab-plus { font-size: 1.6rem; font-weight: 300; line-height: 1; }
-.fab-upload .fab-label { font-size: 1rem; font-weight: 600; letter-spacing: 1px; }
+.fab-upload .fab-plus {
+  font-size: 1.9rem;
+  font-weight: 300;
+  line-height: 1;
+  display: inline-block;
+  transition: transform .25s cubic-bezier(.2,.7,.3,1);
+}
 .fab-upload:hover {
   background: var(--primary-dark);
-  transform: translateY(-2px) scale(1.03);
+  transform: scale(1.05);
   box-shadow: 0 10px 28px rgba(217, 136, 107, 0.6);
 }
+.fab-dial.open .fab-upload .fab-plus { transform: rotate(45deg); }
+.fab-dial.open .fab-upload {
+  background: var(--ink);
+  box-shadow: 0 10px 28px rgba(80, 50, 30, 0.5);
+}
+
+.fab-action {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: var(--card);
+  border: 1px solid #f0dec8;
+  color: var(--ink);
+  font: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(80, 50, 30, 0.15);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(20px) scale(.85);
+  transition: opacity .18s ease, transform .25s cubic-bezier(.2,.7,.3,1), background .15s;
+}
+.fab-action:hover { background: #fff5e9; }
+.fab-action .fab-action-icon { font-size: 1.1rem; }
+
+/* Hide actions by default — they animate in when dial is open */
+.fab-dial:not(.open) .fab-action { pointer-events: none; }
+.fab-dial.open .fab-action {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+/* Subtle stagger so they don't pop in together */
+.fab-dial.open #fab-action-upload { transition-delay: .03s; }
+.fab-dial.open #fab-action-note   { transition-delay: .06s; }
+
+/* Light backdrop when open so taps anywhere else close the dial */
+.fab-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(40, 25, 15, .12);
+  z-index: 49;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s;
+}
+.fab-backdrop.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 @media (max-width: 500px) {
-  .fab-upload {
-    right: 16px; bottom: 16px;
-    height: 52px; padding: 0 18px 0 14px;
+  .fab-dial {
+    right: max(16px, env(safe-area-inset-right, 0px) + 4px);
+    bottom: max(16px, env(safe-area-inset-bottom, 0px) + 8px);
   }
+  .fab-upload { width: 54px; height: 54px; }
+  .fab-action { font-size: .88rem; padding: 10px 16px; }
 }
 
 /* ===== Modal ===== */
