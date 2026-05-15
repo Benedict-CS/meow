@@ -1060,6 +1060,31 @@ $('#batch-fav-btn')?.addEventListener('click', async () => {
   } else { toast('批次更新失敗', 'error'); }
 });
 
+$('#batch-date-btn')?.addEventListener('click', async () => {
+  if (!state.selected.size) return;
+  const input = prompt(
+    `要把選取的 ${state.selected.size} 張改成什麼日期？\n` +
+    `格式：YYYY-MM-DD  或  YYYY-MM-DDTHH:MM\n` +
+    `例如：2024-08-15  或  2024-08-15T14:30`,
+    ''
+  );
+  if (!input) return;
+  let iso = input.trim();
+  // 接受 YYYY-MM-DD（補中午 12:00 當預設時間）
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso = iso + 'T12:00:00';
+  else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso = iso + ':00';
+  if (isNaN(new Date(iso))) {
+    cuteToast('error', '日期格式錯了 😿', 'error');
+    return;
+  }
+  const names = [...state.selected];
+  const result = await apiBatchMeta(names, { captured_at: iso });
+  if (result) {
+    cuteToast('saved', `已把 ${result.updated.length} 張改到 ${iso.slice(0,10)} 📅`, 'ok');
+    await apiList(); render();
+  } else cuteToast('error', '批次更新失敗', 'error');
+});
+
 $('#batch-tag-btn')?.addEventListener('click', async () => {
   if (!state.selected.size) return;
   const tag = prompt('輸入要新增的標籤：');

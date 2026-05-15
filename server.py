@@ -976,6 +976,12 @@ class Handler(BaseHTTPRequestHandler):
             base_patch["favorite"] = bool(patch["favorite"])
         if "caption" in patch:
             base_patch["caption"] = str(patch["caption"])[:500]
+        if "captured_at" in patch:
+            try:
+                datetime.fromisoformat(str(patch["captured_at"]))
+                base_patch["captured_at"] = str(patch["captured_at"])
+            except ValueError:
+                return self._send_json(400, {"error": "bad captured_at"})
 
         updated, missing = [], []
         for name in files:
