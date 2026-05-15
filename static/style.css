@@ -65,11 +65,18 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   display: inline-block;
 }
 
-/* Tiny corner shortcut into /disk — discoverable but doesn't compete with the title */
-.hero-corner {
+/* Tiny corner shortcuts into /trash and /disk. Use a flex container so
+   icons space themselves regardless of font size / padding — manual
+   right-offsets like '70px' / '56px' overlap once you tweak the icon. */
+.hero-corners {
   position: absolute;
   top: 22px;
   right: 22px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.hero-corner {
   font-size: 1.2rem;
   text-decoration: none;
   opacity: .55;
@@ -79,12 +86,12 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   border: 1px solid #f0dec8;
   box-shadow: var(--shadow);
   transition: opacity .15s, transform .15s;
+  line-height: 1;
 }
 .hero-corner:hover { opacity: 1; transform: rotate(-8deg) scale(1.1); }
-.hero-corner-2 { right: 70px; }
 @media (max-width: 500px) {
-  .hero-corner    { top: 14px; right: 14px; font-size: 1rem; padding: 5px 8px; }
-  .hero-corner-2  { right: 56px; }
+  .hero-corners { top: 14px; right: 14px; gap: 8px; }
+  .hero-corner  { font-size: 1rem; padding: 5px 8px; }
 }
 
 /* ===== Uploader ===== */
