@@ -156,9 +156,14 @@
   text-align: center;
   padding: 80px 20px;
   color: var(--ink-soft);
+  grid-column: 1 / -1;  /* span full width of the trash-list grid */
 }
-.empty .emoji { font-size: 4rem; opacity: .5; }
-.empty p { margin: 12px 0 0; }
+.empty p { margin: 14px 0 0; }
+.empty-sub {
+  font-family: 'Caveat', 'Noto Sans TC', cursive;
+  font-size: 1.1rem;
+  color: var(--ink-faint);
+}
 
 @media (max-width: 600px) {
   .trash-main { padding: 0 14px 80px; }

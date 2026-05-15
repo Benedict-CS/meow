@@ -39,7 +39,14 @@ async function load() {
   const tools = $('#trash-toolbar');
 
   if (!items.length) {
-    list.innerHTML = '<div class="empty"><div class="emoji">🗑</div><p>垃圾桶是空的</p></div>';
+    // Reuse the sleeping-cat + Zzz animation from the main gallery's empty
+    // state (class `empty-emoji` is defined in style.css).
+    list.innerHTML = `
+      <div class="empty">
+        <div class="empty-emoji">🐱</div>
+        <p>垃圾桶是空的，沒有要救回的東西</p>
+        <p class="empty-sub">貓貓睡得好沉 💤</p>
+      </div>`;
     tools.hidden = true;
     return;
   }

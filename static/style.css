@@ -65,16 +65,17 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   display: inline-block;
 }
 
-/* Tiny corner shortcuts into /trash and /disk. Use a flex container so
-   icons space themselves regardless of font size / padding — manual
-   right-offsets like '70px' / '56px' overlap once you tweak the icon. */
-.hero-corners {
-  position: absolute;
-  top: 22px;
-  right: 22px;
+/* Tiny shortcuts into /trash and /disk, on a strip ABOVE the hero so they
+   never overlap the title — was happening on phones where 「貓貓相簿」 was
+   wide enough to reach the corner icons. Static topbar keeps them out of
+   the title's way at every viewport. */
+.topbar {
   display: flex;
-  gap: 10px;
+  justify-content: flex-end;
   align-items: center;
+  gap: 10px;
+  padding: 14px 24px 0;
+  padding-top: max(14px, env(safe-area-inset-top, 0px) + 6px);
 }
 .hero-corner {
   font-size: 1.2rem;
@@ -90,7 +91,7 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
 }
 .hero-corner:hover { opacity: 1; transform: rotate(-8deg) scale(1.1); }
 @media (max-width: 500px) {
-  .hero-corners { top: 14px; right: 14px; gap: 8px; }
+  .topbar       { padding: 10px 16px 0; gap: 8px; }
   .hero-corner  { font-size: 1rem; padding: 5px 8px; }
 }
 
@@ -129,7 +130,9 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   bottom: 28px;
   z-index: 50;
   display: flex;
-  flex-direction: column-reverse;
+  /* column (not column-reverse): with HTML order [📝 note, 📷 upload, ＋],
+     the ＋ ends up at the bottom anchored to viewport, actions stack above. */
+  flex-direction: column;
   align-items: flex-end;
   gap: 12px;
   pointer-events: none;        /* let children handle clicks */
