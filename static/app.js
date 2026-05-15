@@ -110,9 +110,15 @@ function monthLabel(key) {
 
 // ---------- API ----------
 async function apiList() {
-  const r = await fetch('/api/list', { cache: 'no-store' });
-  const data = await r.json();
-  state.items = data.items || [];
+  try {
+    const r = await fetch('/api/list', { cache: 'no-store' });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const data = await r.json();
+    state.items = data.items || [];
+  } catch (e) {
+    console.warn('apiList failed', e);
+    toast('載入相簿失敗 — 再試一次？', 'error');
+  }
 }
 async function apiPatchMeta(name, patch) {
   const r = await fetch('/api/meta?file=' + encodeURIComponent(name), {
@@ -218,7 +224,22 @@ function render() {
 
   // wipe gallery contents (keep empty-state node)
   [...gallery.querySelectorAll('.item, .month-header')].forEach(n => n.remove());
-  $('#empty-state').hidden = items.length > 0;
+  const emptyEl = $('#empty-state');
+  emptyEl.hidden = items.length > 0;
+  // Tailor the empty-state text to whatever filter/search is active so it
+  // doesn't say '還沒有照片' when the user has just searched for nothing.
+  if (!emptyEl.hidden) {
+    const txt = emptyEl.querySelector('.empty-text');
+    const total = state.items.length;
+    if (state.search) txt.textContent = `找不到「${state.search}」`;
+    else if (state.activeTag) txt.textContent = `沒有 #${state.activeTag} 的項目`;
+    else if (total === 0) txt.textContent = '還沒有照片，用右下角 ＋ 上傳第一張喵喵照吧～';
+    else if (state.filter === 'image') txt.textContent = '這個篩選下沒有照片';
+    else if (state.filter === 'video') txt.textContent = '這個篩選下沒有影片';
+    else if (state.filter === 'note')  txt.textContent = '還沒有筆記 — 用右下角 ＋ → 寫筆記';
+    else if (state.filter === 'favorite') txt.textContent = '還沒有最愛的項目';
+    else txt.textContent = '空空的';
+  }
 
   // group by month
   const groups = new Map();
@@ -393,6 +414,10 @@ function renderItem(it, idx) {
 function renderNote(note, idx) {
   const node = document.createElement('div');
   node.className = 'item note' + (note.favorite ? ' is-favorite' : '');
+  // Preserve visual selection state across re-renders during select-mode
+  // (toggleSelect adds the class to the node directly, but a fresh render
+  // would otherwise drop it for notes).
+  if (state.selected.has(note.id)) node.classList.add('selected');
   node.dataset.idx = idx;
   node.dataset.id = note.id;
 
@@ -1306,7 +1331,17 @@ function applyUrlState() {
     if (v) {
       const items = visibleItems();
       const i = items.findIndex(it => it.name === v);
-      if (i >= 0) { state.lbIndex = i; lb.hidden = false; document.body.style.overflow='hidden'; showLb(); }
+      if (i >= 0) {
+        if (items[i].kind === 'note') {
+          // Notes open the editor, not the lightbox — avoid the flash.
+          openNoteEditor(items[i]);
+        } else {
+          state.lbIndex = i;
+          lb.hidden = false;
+          document.body.style.overflow = 'hidden';
+          showLb();
+        }
+      }
     } else if (!lb.hidden) {
       closeLightbox();
     }
@@ -1339,8 +1374,8 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (refreshing) return;
     refreshing = true;
-    toast('🔄 偵測到新版本，3 秒後自動更新…', 'ok');
-    setTimeout(() => window.location.reload(), 3000);
+    toast('🔄 新版來了，5 秒後自動更新…', 'ok');
+    setTimeout(() => window.location.reload(), 5000);
   });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {

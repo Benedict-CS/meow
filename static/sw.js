@@ -42,8 +42,29 @@ self.addEventListener('fetch', (evt) => {
   if (url.pathname.startsWith('/api/')) return;
   if (url.pathname.startsWith('/uploads/')) return;
   if (url.pathname.startsWith('/thumbs/')) return;
+  if (url.pathname.startsWith('/trash-files/')) return;
+  if (url.pathname.startsWith('/trash-thumbs/')) return;
 
-  // App shell → cache-first, fall back to network and update.
+  // HTML navigation (clicking a link, typing a URL, refreshing) → network-first.
+  // Otherwise navigating between /, /disk, /trash kept serving the user a
+  // stale cached page even after I shipped a new version. Cache stays as the
+  // offline fallback only.
+  if (req.mode === 'navigate' || req.destination === 'document') {
+    evt.respondWith(
+      fetch(req).then((resp) => {
+        if (resp.ok) {
+          const copy = resp.clone();
+          caches.open(VERSION).then((c) => c.put(req, copy)).catch(() => {});
+        }
+        return resp;
+      }).catch(() => caches.match(req))
+    );
+    return;
+  }
+
+  // Static assets (JS / CSS / icons) → cache-first stale-while-revalidate.
+  // Eventual consistency is fine here since they're fingerprinted by VERSION
+  // and the new SW wipes the old cache on activate.
   evt.respondWith(
     caches.match(req).then((cached) => {
       const fetchPromise = fetch(req).then((resp) => {

@@ -77,6 +77,11 @@ main { max-width: 1200px; margin: 0 auto; padding: 0 24px 80px; }
   padding: 14px 24px 0;
   padding-top: max(14px, env(safe-area-inset-top, 0px) + 6px);
 }
+/* On phones, split the two icons left + right so they don't crowd a
+   single corner and leave more breathing room for the centered title. */
+@media (max-width: 500px) {
+  .topbar { justify-content: space-between; }
+}
 .hero-corner {
   font-size: 1.2rem;
   text-decoration: none;
