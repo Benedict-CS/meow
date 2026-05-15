@@ -170,6 +170,32 @@ Daily cron example:
 
 ---
 
+## Sharing the notes timeline across machines
+
+Photos meta and content hashes stay in `data/meta.json` (gitignored — each
+instance has its own photo library). But the text-only **timeline notes**
+(`📝` sticky cards) often want to ride along with `git pull` so a freshly
+cloned host gets the same memory wall.
+
+There's a tiny helper for that — `scripts/notes.py`:
+
+```bash
+# On the host where you write notes:
+python3 scripts/notes.py export        # dumps notes → notes-seed.json (committed to git)
+git add notes-seed.json && git commit -m "Update notes timeline" && git push
+
+# On any other host after git pull:
+python3 scripts/notes.py import        # merges notes-seed.json into local data/meta.json
+                                       # additive only — won't overwrite local notes
+```
+
+`scripts/notes.py status` shows where everything is. The import step is
+**idempotent**: re-running just skips notes already present locally.
+
+If you'd rather not keep the seed file around long-term, `git rm
+notes-seed.json` after every host has imported is fine — the script can
+re-create it any time via `export`.
+
 ## Install as a PWA
 
 **iPhone (Safari)** — open `http://<host>:8000` → Share → Add to Home Screen. Launching from the home-screen icon opens it as a standalone, full-screen app with no URL bar.
