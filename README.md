@@ -196,6 +196,23 @@ If you'd rather not keep the seed file around long-term, `git rm
 notes-seed.json` after every host has imported is fine — the script can
 re-create it any time via `export`.
 
+## Limitations over plain HTTP on a LAN
+
+Some browser APIs only work in a "secure context" (HTTPS or `localhost`).
+If you serve the gallery as plain HTTP to other devices on the LAN, expect:
+
+- **Web Share with a file (⤓ Download/Share button on iOS Safari)** — silently
+  unavailable; the lightbox falls back to a plain `<a download>` link, which
+  still works on desktop but is less smooth on phones. Long-press on the
+  photo still gives "Save to Photos" though.
+- **Service Worker / offline cache / install banner** — won't register over
+  HTTP-LAN. You can still "Add to Home Screen" from iOS Safari (manifest
+  works), but installed PWA features (offline, push) are dormant.
+
+To get the full experience, terminate TLS in front of the gallery — easiest
+options: Tailscale Funnel, Cloudflare Tunnel, or a local reverse proxy with
+a self-signed cert.
+
 ## Install as a PWA
 
 **iPhone (Safari)** — open `http://<host>:8000` → Share → Add to Home Screen. Launching from the home-screen icon opens it as a standalone, full-screen app with no URL bar.

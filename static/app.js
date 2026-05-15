@@ -1045,6 +1045,55 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 's' || e.key === 'S') lbShare.click();
 });
 
+// ---------- Generic ask modal (replaces window.prompt) ----------
+// Returns a Promise resolving to the trimmed input string, or null if cancelled.
+// Works in iOS standalone PWA mode where native prompt() may not show.
+const _askEl = {
+  modal:  $('#ask-modal'),
+  title:  $('#ask-modal-title'),
+  desc:   $('#ask-modal-desc'),
+  input:  $('#ask-modal-input'),
+  ok:     $('#ask-modal-ok'),
+  cancel: $('#ask-modal-cancel'),
+  close:  $('#ask-modal-close'),
+};
+function askModal({ title = '輸入', desc = '', inputType = 'text', placeholder = '', initial = '' } = {}) {
+  return new Promise((resolve) => {
+    _askEl.title.textContent = title;
+    _askEl.desc.textContent = desc;
+    _askEl.desc.hidden = !desc;
+    _askEl.input.type = inputType;
+    _askEl.input.placeholder = placeholder;
+    _askEl.input.value = initial;
+    _askEl.modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => _askEl.input.focus(), 50);
+
+    const cleanup = (val) => {
+      _askEl.modal.hidden = true;
+      document.body.style.overflow = '';
+      _askEl.ok.onclick = null;
+      _askEl.cancel.onclick = null;
+      _askEl.close.onclick = null;
+      _askEl.modal.onclick = null;
+      _askEl.input.onkeydown = null;
+      resolve(val);
+    };
+    const submit = () => {
+      const v = _askEl.input.value.trim();
+      cleanup(v || null);
+    };
+    _askEl.ok.onclick = submit;
+    _askEl.cancel.onclick = () => cleanup(null);
+    _askEl.close.onclick = () => cleanup(null);
+    _askEl.modal.onclick = (e) => { if (e.target === _askEl.modal) cleanup(null); };
+    _askEl.input.onkeydown = (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); submit(); }
+      else if (e.key === 'Escape') { e.preventDefault(); cleanup(null); }
+    };
+  });
+}
+
 // ---------- Batch meta (favorite / tag) ----------
 $('#batch-fav-btn')?.addEventListener('click', async () => {
   if (!state.selected.size) return;
@@ -1062,17 +1111,14 @@ $('#batch-fav-btn')?.addEventListener('click', async () => {
 
 $('#batch-date-btn')?.addEventListener('click', async () => {
   if (!state.selected.size) return;
-  const input = prompt(
-    `要把選取的 ${state.selected.size} 張改成什麼日期？\n` +
-    `格式：YYYY-MM-DD  或  YYYY-MM-DDTHH:MM\n` +
-    `例如：2024-08-15  或  2024-08-15T14:30`,
-    ''
-  );
-  if (!input) return;
-  let iso = input.trim();
-  // 接受 YYYY-MM-DD（補中午 12:00 當預設時間）
-  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) iso = iso + 'T12:00:00';
-  else if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(iso)) iso = iso + ':00';
+  const raw = await askModal({
+    title: '📅 批次改拍攝時間',
+    desc:  `要把選取的 ${state.selected.size} 張改成什麼時間？\n用原生日期選擇器，可以只選日期也可以挑到時分。`,
+    inputType: 'datetime-local',
+  });
+  if (!raw) return;
+  // datetime-local 給的是 "YYYY-MM-DDTHH:MM"，補上秒
+  const iso = raw.length === 16 ? raw + ':00' : raw;
   if (isNaN(new Date(iso))) {
     cuteToast('error', '日期格式錯了 😿', 'error');
     return;
@@ -1087,12 +1133,17 @@ $('#batch-date-btn')?.addEventListener('click', async () => {
 
 $('#batch-tag-btn')?.addEventListener('click', async () => {
   if (!state.selected.size) return;
-  const tag = prompt('輸入要新增的標籤：');
-  if (!tag || !tag.trim()) return;
+  const tag = await askModal({
+    title: '# 批次加標籤',
+    desc:  `要在 ${state.selected.size} 個項目上加什麼標籤？`,
+    inputType: 'text',
+    placeholder: '例如：探吉 / 出遊 / 醫療',
+  });
+  if (!tag) return;
   const names = [...state.selected];
-  const result = await apiBatchMeta(names, { tags_add: [tag.trim()] });
+  const result = await apiBatchMeta(names, { tags_add: [tag] });
   if (result) {
-    toast(`已加標籤到 ${result.updated.length} 個`, 'ok');
+    toast(`已加標籤到 ${result.updated.length} 個 #${tag}`, 'ok');
     await apiList(); render();
   } else { toast('批次更新失敗', 'error'); }
 });

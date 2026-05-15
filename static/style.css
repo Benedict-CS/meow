@@ -588,6 +588,41 @@ body.select-mode .delete-btn { display: none; }
   .item.note { width: 80vw; max-width: 300px; }
 }
 
+/* Generic ask-modal (replaces window.prompt — works in iOS PWA standalone) */
+.ask-modal-card { width: min(440px, 100%); }
+.ask-modal-desc {
+  color: var(--ink-soft);
+  font-size: .9rem;
+  line-height: 1.55;
+  margin: 0 0 14px;
+  white-space: pre-line;
+}
+.ask-modal-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #f0dec8;
+  background: #fffef5;
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  color-scheme: light;
+}
+.ask-modal-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(217, 136, 107, 0.15);
+}
+.ask-modal-actions {
+  display: flex; gap: 10px;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+@media (max-width: 500px) {
+  .ask-modal-input { font-size: 16px; }  /* avoid iOS auto-zoom */
+}
+
 /* Note modal — extends .modal-card */
 .note-modal-card { width: min(540px, 100%); }
 .note-form { display: flex; flex-direction: column; gap: 14px; }

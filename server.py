@@ -115,6 +115,19 @@ def update_meta(filename: str, patch: dict):
         return cur
 
 
+def batch_update_meta(updates: dict):
+    """Apply many {filename: patch} pairs in a single meta.json rewrite."""
+    if not updates:
+        return
+    with _meta_lock:
+        data = load_meta()
+        for name, patch in updates.items():
+            cur = data["files"].get(name, {})
+            cur.update(patch)
+            data["files"][name] = cur
+        save_meta(data)
+
+
 def remove_meta(filename: str):
     with _meta_lock:
         data = load_meta()
@@ -530,7 +543,8 @@ def gather_stats() -> dict:
 
 # ---------- Listing ----------
 def list_uploads():
-    meta = load_meta()["files"]
+    full_meta = load_meta()
+    meta = full_meta["files"]
     items = []
     for p in UPLOAD_DIR.iterdir():
         if not p.is_file() or p.name.startswith("."):
@@ -556,8 +570,7 @@ def list_uploads():
 
     # Notes — text-only entries with no file on disk, but they live on the
     # same timeline so the gallery groups them with photos by captured_at.
-    meta_full = load_meta()
-    for nid, rec in meta_full.get("notes", {}).items():
+    for nid, rec in full_meta.get("notes", {}).items():
         items.append({
             "id": nid,
             "name": nid,                              # used as the unique key
@@ -589,6 +602,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
+
+    def _send_sw_js(self):
+        """Serve sw.js with VERSION substituted to the newest static file's mtime.
+        Without this, the browser's service worker keeps serving stale app.js /
+        style.css after a code update — users have to hard-refresh to see new
+        features. Auto-bumping VERSION makes the SW reinstall on every code change."""
+        sw_path = STATIC_DIR / "sw.js"
+        if not sw_path.is_file():
+            return self.send_error(404, "Not Found")
+        try:
+            latest = max(f.stat().st_mtime for f in STATIC_DIR.iterdir() if f.is_file())
+            version = f"cat-gallery-{int(latest)}"
+        except Exception:
+            version = "cat-gallery-v1"
+        body = sw_path.read_text(encoding="utf-8").replace(
+            "'cat-gallery-v1'", f"'{version}'"
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        try:
+            self.wfile.write(body)
+        except (BrokenPipeError, ConnectionResetError):
+            pass
 
     def _send_file(self, path: Path, cache=True):
         if not path.is_file():
@@ -685,7 +724,7 @@ class Handler(BaseHTTPRequestHandler):
         # PWA: service worker must be served from the site root so its scope
         # covers /api, /uploads etc. Manifest can live anywhere.
         if path == "/sw.js":
-            return self._send_file(STATIC_DIR / "sw.js", cache=False)
+            return self._send_sw_js()
         if path == "/manifest.json":
             return self._send_file(STATIC_DIR / "manifest.json", cache=False)
 
@@ -1086,7 +1125,9 @@ def backfill_existing():
         changed = True
         sys.stderr.write(f"[backfill-convert] {old_name} -> {new_p.name}\n")
 
-    # Pass 2 — thumbnails + meta defaults + hashes for everything currently present.
+    # Pass 2 — thumbnails + meta defaults for everything currently present.
+    # NOTE: hash computation moved to a background thread (see _backfill_hashes_async)
+    # so server startup stays fast even with thousands of files.
     for p in UPLOAD_DIR.iterdir():
         if not p.is_file() or p.name.startswith("."):
             continue
@@ -1106,12 +1147,6 @@ def backfill_existing():
             }
             files[p.name] = rec
             changed = True
-        if not rec.get("hash"):
-            try:
-                rec["hash"] = _hash_bytes(p.read_bytes())
-                changed = True
-            except Exception as e:
-                sys.stderr.write(f"[backfill-hash] {p.name}: {e}\n")
         if rec.get("processing"):
             # Resume any half-finished video job from before a restart.
             _jobs.put(p.name)
@@ -1120,11 +1155,41 @@ def backfill_existing():
         save_meta(data)
 
 
+def _backfill_hashes_async():
+    """Compute SHA-1 for files missing the hash field. Runs in a daemon thread
+    so server startup isn't blocked by big libraries. Updates _hash_index as
+    each hash becomes available so dedup gradually starts working."""
+    try:
+        data = load_meta()
+        todo = [name for name, rec in data["files"].items() if not rec.get("hash")]
+        if not todo:
+            return
+        sys.stderr.write(f"[hash-backfill] computing for {len(todo)} files\n")
+        updates = {}
+        for name in todo:
+            p = UPLOAD_DIR / name
+            if not p.is_file():
+                continue
+            try:
+                h = _hash_bytes(p.read_bytes())
+                updates[name] = {"hash": h}
+                _hash_register(h, name)
+            except Exception as e:
+                sys.stderr.write(f"[hash-backfill] {name}: {e}\n")
+        batch_update_meta(updates)
+        sys.stderr.write(f"[hash-backfill] done ({len(updates)} hashed)\n")
+    except Exception as e:
+        sys.stderr.write(f"[hash-backfill] aborted: {e}\n")
+
+
 def main():
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     backfill_existing()
     _rebuild_hash_index()
+    # Hash backfill runs in background — first request can hit server within
+    # ~50ms even if there are thousands of un-hashed files to chew through.
+    threading.Thread(target=_backfill_hashes_async, daemon=True, name="hash-backfill").start()
     threading.Thread(target=_worker_loop, daemon=True, name="cat-worker").start()
     srv = ThreadingHTTPServer((host, port), Handler)
     print(f"🐾 Cat gallery running at http://{host}:{port}")
