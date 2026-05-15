@@ -26,6 +26,7 @@ A scrapbook-style photo & video album for the cats in your life — pure-Python 
 - 🔁 **Content-hash dedup** — SHA-1 of upload bytes; re-uploading the same file collapses to the existing record
 - ✏️ **Editable metadata** — caption, tags, capture time, favorite — all from inside the lightbox
 - ☑️ **Batch ops** — multi-select to delete / add tag / toggle favorite
+- 📝 **Text notes** — record events that have no photo (naming day, vet visit, etc.) as sticky-note cards on the same timeline
 - 🔗 **URL state** — filter / search / open photo are reflected in the hash, so refresh + back + share-link all work
 
 ---
@@ -124,6 +125,9 @@ meow/
 | `DELETE` | `/api/delete?file=`   | —                                                                   |
 | `POST`   | `/api/batch-delete`   | `{ "files": [...] }`                                                |
 | `POST`   | `/api/batch-meta`     | `{ "files": [...], "patch": { favorite?, caption?, tags_add?, tags_remove? } }` |
+| `POST`   | `/api/note`           | `{ text, captured_at?, tags? }` — create a text-only timeline entry |
+| `PUT`    | `/api/note?id=`       | JSON patch: `{text?, captured_at?, tags?, favorite?}` |
+| `DELETE` | `/api/note?id=`       | — |
 | `GET`    | `/uploads/*`          | Originals (supports `Range`)                                        |
 | `GET`    | `/thumbs/*`           | Thumbnails                                                          |
 | `GET`    | `/sw.js`, `/manifest.json` | PWA assets                                                     |

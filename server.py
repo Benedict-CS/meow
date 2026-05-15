@@ -79,17 +79,23 @@ _jobs: "queue.Queue[str]" = queue.Queue()
 
 
 # ---------- Metadata store ----------
+def _empty_meta():
+    return {"files": {}, "notes": {}}
+
+
 def load_meta() -> dict:
     if not META_PATH.is_file():
-        return {"files": {}}
+        return _empty_meta()
     try:
         with META_PATH.open("r", encoding="utf-8") as f:
             data = json.load(f)
         if "files" not in data:
             data["files"] = {}
+        if "notes" not in data:
+            data["notes"] = {}
         return data
     except Exception:
-        return {"files": {}}
+        return _empty_meta()
 
 
 def save_meta(data: dict):
@@ -115,6 +121,63 @@ def remove_meta(filename: str):
         if filename in data["files"]:
             del data["files"][filename]
             save_meta(data)
+
+
+# ---------- Notes (text-only timeline entries, no file on disk) ----------
+def add_note(text: str, captured_at: str = "", tags=None, favorite: bool = False):
+    nid = f"n-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+    rec = {
+        "text": str(text)[:2000],
+        "captured_at": captured_at or datetime.now().isoformat(timespec="seconds"),
+        "tags": [str(t)[:30] for t in (tags or [])][:20],
+        "favorite": bool(favorite),
+        "created_at": datetime.now().isoformat(timespec="seconds"),
+    }
+    with _meta_lock:
+        data = load_meta()
+        data["notes"][nid] = rec
+        save_meta(data)
+    return nid, rec
+
+
+def update_note(nid: str, patch: dict):
+    with _meta_lock:
+        data = load_meta()
+        rec = data["notes"].get(nid)
+        if rec is None:
+            return None
+        if "text" in patch:
+            rec["text"] = str(patch["text"])[:2000]
+        if "captured_at" in patch:
+            try:
+                datetime.fromisoformat(str(patch["captured_at"]))
+                rec["captured_at"] = str(patch["captured_at"])
+            except ValueError:
+                pass
+        if "tags" in patch and isinstance(patch["tags"], list):
+            rec["tags"] = [str(t)[:30] for t in patch["tags"]][:20]
+        if "favorite" in patch:
+            rec["favorite"] = bool(patch["favorite"])
+        data["notes"][nid] = rec
+        save_meta(data)
+        return rec
+
+
+def delete_note(nid: str) -> bool:
+    with _meta_lock:
+        data = load_meta()
+        if nid in data["notes"]:
+            del data["notes"][nid]
+            save_meta(data)
+            return True
+        return False
+
+
+_NOTE_ID_RE = re.compile(r"^n-\d{8}-\d{6}-[0-9a-f]{6}$")
+
+
+def _is_note_id(s: str) -> bool:
+    return bool(_NOTE_ID_RE.match(s or ""))
 
 
 # ---------- Helpers ----------
@@ -490,7 +553,23 @@ def list_uploads():
             "tags": m.get("tags", []),
             "processing": bool(m.get("processing", False)),
         })
-    items.sort(key=lambda x: x["captured_at"], reverse=True)
+
+    # Notes — text-only entries with no file on disk, but they live on the
+    # same timeline so the gallery groups them with photos by captured_at.
+    meta_full = load_meta()
+    for nid, rec in meta_full.get("notes", {}).items():
+        items.append({
+            "id": nid,
+            "name": nid,                              # used as the unique key
+            "kind": "note",
+            "text": rec.get("text", ""),
+            "captured_at": rec.get("captured_at"),
+            "tags": rec.get("tags", []),
+            "favorite": bool(rec.get("favorite", False)),
+            "created_at": rec.get("created_at"),
+        })
+
+    items.sort(key=lambda x: x["captured_at"] or "", reverse=True)
     return items
 
 
@@ -639,12 +718,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_batch_delete()
         if path == "/api/batch-meta":
             return self._handle_batch_meta()
+        if path == "/api/note":
+            return self._handle_note_create()
 
         self.send_error(404, "Not Found")
 
     def do_PUT(self):
         parsed = urlparse(self.path)
-        if unquote(parsed.path) != "/api/meta":
+        path = unquote(parsed.path)
+        if path == "/api/note":
+            return self._handle_note_update()
+        if path != "/api/meta":
             return self.send_error(404, "Not Found")
         params = parse_qs(parsed.query)
         name = (params.get("file") or [""])[0]
@@ -682,7 +766,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         parsed = urlparse(self.path)
-        if unquote(parsed.path) != "/api/delete":
+        path = unquote(parsed.path)
+        if path == "/api/note":
+            return self._handle_note_delete()
+        if path != "/api/delete":
             return self.send_error(404, "Not Found")
         params = parse_qs(parsed.query)
         name = (params.get("file") or [""])[0]
@@ -811,6 +898,58 @@ class Handler(BaseHTTPRequestHandler):
             })
 
         return self._send_json(200, {"saved": saved, "errors": errors})
+
+    def _handle_note_create(self):
+        body = self._read_body()
+        if body is None:
+            return self._send_json(413, {"error": "body too large"})
+        try:
+            payload = json.loads(body or b"{}")
+        except json.JSONDecodeError:
+            return self._send_json(400, {"error": "bad json"})
+        text = str(payload.get("text", "")).strip()
+        if not text:
+            return self._send_json(400, {"error": "empty text"})
+        captured = str(payload.get("captured_at", ""))
+        if captured:
+            try:
+                datetime.fromisoformat(captured)
+            except ValueError:
+                return self._send_json(400, {"error": "bad captured_at"})
+        tags = payload.get("tags") or []
+        if not isinstance(tags, list):
+            return self._send_json(400, {"error": "tags must be a list"})
+        favorite = bool(payload.get("favorite", False))
+        nid, rec = add_note(text, captured, tags, favorite)
+        return self._send_json(200, {"id": nid, "note": rec})
+
+    def _handle_note_update(self):
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        nid = (params.get("id") or [""])[0]
+        if not _is_note_id(nid):
+            return self._send_json(400, {"error": "invalid id"})
+        body = self._read_body()
+        if body is None:
+            return self._send_json(413, {"error": "body too large"})
+        try:
+            patch = json.loads(body or b"{}")
+        except json.JSONDecodeError:
+            return self._send_json(400, {"error": "bad json"})
+        rec = update_note(nid, patch)
+        if rec is None:
+            return self._send_json(404, {"error": "not found"})
+        return self._send_json(200, {"id": nid, "note": rec})
+
+    def _handle_note_delete(self):
+        parsed = urlparse(self.path)
+        params = parse_qs(parsed.query)
+        nid = (params.get("id") or [""])[0]
+        if not _is_note_id(nid):
+            return self._send_json(400, {"error": "invalid id"})
+        if not delete_note(nid):
+            return self._send_json(404, {"error": "not found"})
+        return self._send_json(200, {"deleted": nid})
 
     def _handle_batch_meta(self):
         """Apply a metadata patch to many files. Body: {files:[...], patch:{...}}.

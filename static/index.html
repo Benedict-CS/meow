@@ -45,10 +45,12 @@
         <button class="chip active" data-filter="all">全部</button>
         <button class="chip" data-filter="image">📷 照片</button>
         <button class="chip" data-filter="video">🎬 影片</button>
+        <button class="chip" data-filter="note">📝 筆記</button>
         <button class="chip" data-filter="favorite">❤️ 最愛</button>
       </div>
 
       <div class="actions">
+        <button class="btn-ghost" id="new-note-btn" title="寫個只有文字的紀錄">📝 筆記</button>
         <button class="btn-ghost" id="select-mode-btn" title="多選">☑️ 多選</button>
       </div>
     </section>
@@ -87,6 +89,30 @@
         <div class="drop-formats">JPG / PNG / GIF / WEBP / MP4 / WEBM / MOV · 一次可選多張 · 最多 500 MB</div>
       </div>
       <div id="upload-list" class="upload-list" hidden></div>
+    </div>
+  </div>
+
+  <div id="note-modal" class="modal" hidden>
+    <div class="modal-card note-modal-card">
+      <button class="modal-close" id="note-modal-close" aria-label="關閉">✕</button>
+      <h2 class="modal-title" id="note-modal-title">📝 寫筆記</h2>
+      <div class="note-form">
+        <textarea id="note-text" placeholder="今天的喵喵故事…&#10;&#10;例如：今天給他取名叫探吉 🐱" maxlength="2000"></textarea>
+        <label class="note-field">
+          <span>日期</span>
+          <input type="datetime-local" id="note-date" />
+        </label>
+        <label class="note-field">
+          <span>標籤</span>
+          <input type="text" id="note-tags-input" list="all-tags" placeholder="逗號分隔，如：探吉, 命名" />
+        </label>
+        <div class="note-form-actions">
+          <button type="button" class="btn-ghost" id="note-delete-btn" hidden>🗑 刪除</button>
+          <span class="note-form-spacer"></span>
+          <button type="button" class="btn-ghost" id="note-cancel">取消</button>
+          <button type="button" class="btn-primary" id="note-save">✓ 儲存</button>
+        </div>
+      </div>
     </div>
   </div>
 

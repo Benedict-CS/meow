@@ -479,6 +479,179 @@ body.select-mode .delete-btn { display: none; }
   transform: translateX(-50%) rotate(-2deg);
 }
 
+/* ===== Sticky-note cards (text-only timeline entries) ===== */
+.item.note {
+  --tilt: 0deg;
+  flex: 0 0 auto;
+  width: 220px;
+  min-height: 200px;
+  position: relative;
+  padding: 30px 18px 22px;
+  background: linear-gradient(135deg, #fff9c4 0%, #fff59d 100%);
+  border-radius: 2px;
+  box-shadow:
+    0 1px 2px rgba(80, 50, 30, 0.1),
+    0 6px 18px rgba(80, 50, 30, 0.12),
+    inset 0 0 0 1px rgba(0,0,0,0.02);
+  cursor: pointer;
+  transform: rotate(var(--tilt));
+  transition: transform .25s ease, box-shadow .25s ease;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.item.note:hover {
+  transform: rotate(0deg) translateY(-6px) scale(1.02);
+  box-shadow:
+    0 4px 8px rgba(80, 50, 30, 0.12),
+    0 16px 36px rgba(80, 50, 30, 0.22);
+  z-index: 5;
+}
+.item.note[data-color="1"] { background: linear-gradient(135deg, #c8e6c9 0%, #a5d6a7 100%); }
+.item.note[data-color="2"] { background: linear-gradient(135deg, #ffccbc 0%, #ffab91 100%); }
+.item.note[data-color="3"] { background: linear-gradient(135deg, #d1c4e9 0%, #b39ddb 100%); }
+.item.note[data-color="4"] { background: linear-gradient(135deg, #b3e5fc 0%, #81d4fa 100%); }
+
+.note-date {
+  font-family: 'Caveat', 'Noto Sans TC', cursive;
+  font-size: .95rem;
+  color: rgba(60, 40, 25, 0.55);
+  letter-spacing: 1.5px;
+  margin: 0;
+}
+.note-text {
+  font-family: 'Kalam', 'Caveat', 'Noto Sans TC', cursive;
+  font-size: 1.15rem;
+  line-height: 1.45;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  flex: 1;
+}
+.note-text.empty { color: var(--ink-faint); font-style: italic; }
+.note-tags {
+  display: flex; flex-wrap: wrap; gap: 4px;
+  margin-top: 6px;
+}
+.note-tags .tag {
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(60, 40, 25, 0.75);
+  font-size: .72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-family: 'Noto Sans TC', sans-serif;
+  font-weight: 600;
+}
+.item.note.is-favorite::after {
+  content: "❤";
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: white;
+  color: var(--heart);
+  font-size: .9rem;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 3px 10px rgba(236, 94, 107, 0.4);
+  transform: rotate(12deg);
+  z-index: 3;
+  pointer-events: none;
+}
+.item.note .fav-btn,
+.item.note .delete-btn {
+  position: absolute;
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  background: rgba(255,255,255,.7);
+  border: none;
+  cursor: pointer;
+  font-size: .85rem;
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0;
+  transition: opacity .2s, transform .15s, background .15s, color .15s;
+  z-index: 4;
+}
+.item.note .fav-btn    { top: 10px; left: 10px; color: var(--ink-soft); }
+.item.note .delete-btn { top: 10px; right: 10px; color: var(--danger); }
+.item.note:hover .fav-btn,
+.item.note:hover .delete-btn { opacity: 1; }
+.item.note.is-favorite .fav-btn { opacity: 1; color: var(--heart); }
+.item.note .delete-btn:hover { background: var(--danger); color: white; transform: scale(1.15); }
+
+/* Narrow screens — match polaroid sizing */
+@media (max-width: 760px) {
+  .item.note { width: 44vw; max-width: 240px; min-height: 180px; }
+}
+@media (max-width: 440px) {
+  .item.note { width: 80vw; max-width: 300px; }
+}
+
+/* Note modal — extends .modal-card */
+.note-modal-card { width: min(540px, 100%); }
+.note-form { display: flex; flex-direction: column; gap: 14px; }
+.note-form textarea#note-text {
+  width: 100%;
+  min-height: 140px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #f0dec8;
+  background: #fffef5;
+  color: var(--ink);
+  font-family: 'Kalam', 'Caveat', 'Noto Sans TC', cursive;
+  font-size: 1.1rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.note-form textarea#note-text:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(217, 136, 107, 0.15);
+}
+.note-field {
+  display: flex; align-items: center; gap: 12px;
+  font-size: .9rem; color: var(--ink-soft);
+}
+.note-field > span { flex: 0 0 50px; }
+.note-field input {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #f0dec8;
+  background: var(--card);
+  font: inherit;
+  font-size: .95rem;
+  outline: none;
+  color: var(--ink);
+}
+.note-field input:focus { border-color: var(--primary); }
+
+.note-form-actions {
+  display: flex; gap: 10px;
+  align-items: center;
+  margin-top: 6px;
+}
+.note-form-spacer { flex: 1; }
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font: inherit; font-size: .9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, transform .15s;
+}
+.btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+
+@media (max-width: 500px) {
+  .note-form textarea#note-text { font-size: 16px; min-height: 120px; }
+  .note-form-actions { flex-wrap: wrap; }
+}
+
 /* Favorite gets a gold heart sticker on the corner */
 .item.polaroid.is-favorite::after {
   content: "❤";

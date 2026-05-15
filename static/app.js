@@ -143,6 +143,26 @@ async function apiBatchMeta(names, patch) {
   });
   return r.ok ? r.json() : null;
 }
+async function apiCreateNote(payload) {
+  const r = await fetch('/api/note', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return r.ok ? r.json() : null;
+}
+async function apiUpdateNote(id, patch) {
+  const r = await fetch('/api/note?id=' + encodeURIComponent(id), {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  });
+  return r.ok ? r.json() : null;
+}
+async function apiDeleteNote(id) {
+  const r = await fetch('/api/note?id=' + encodeURIComponent(id), { method: 'DELETE' });
+  return r.ok;
+}
 
 // ---------- Filtering ----------
 function visibleItems() {
@@ -150,10 +170,11 @@ function visibleItems() {
   return state.items.filter(it => {
     if (state.filter === 'image' && it.kind !== 'image') return false;
     if (state.filter === 'video' && it.kind !== 'video') return false;
+    if (state.filter === 'note'  && it.kind !== 'note')  return false;
     if (state.filter === 'favorite' && !it.favorite) return false;
     if (state.activeTag && !(it.tags || []).includes(state.activeTag)) return false;
     if (q) {
-      const hay = (it.name + ' ' + (it.caption||'') + ' ' + (it.tags||[]).join(' ')).toLowerCase();
+      const hay = ((it.name||'') + ' ' + (it.caption||'') + ' ' + (it.text||'') + ' ' + (it.tags||[]).join(' ')).toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -216,7 +237,7 @@ function render() {
     gallery.appendChild(hdr);
 
     for (const it of groups.get(mk)) {
-      gallery.appendChild(renderItem(it, visibleIdx));
+      gallery.appendChild(it.kind === 'note' ? renderNote(it, visibleIdx) : renderItem(it, visibleIdx));
       visibleIdx++;
     }
   }
@@ -369,6 +390,77 @@ function renderItem(it, idx) {
   return node;
 }
 
+function renderNote(note, idx) {
+  const node = document.createElement('div');
+  node.className = 'item note' + (note.favorite ? ' is-favorite' : '');
+  node.dataset.idx = idx;
+  node.dataset.id = note.id;
+
+  // deterministic tilt + color
+  const h = hashStr(note.id);
+  const tilt = ((h % 60) - 30) / 12;       // a bit less aggressive than polaroids
+  const color = h % 5;                     // 0 default + 4 variants
+  node.style.setProperty('--tilt', `${tilt}deg`);
+  node.dataset.color = String(color);
+
+  const date = document.createElement('div');
+  date.className = 'note-date';
+  date.textContent = fmtShortDate(note.captured_at);
+  node.appendChild(date);
+
+  const text = document.createElement('div');
+  text.className = 'note-text' + (note.text ? '' : ' empty');
+  text.textContent = note.text || '（空筆記）';
+  node.appendChild(text);
+
+  if ((note.tags || []).length) {
+    const tw = document.createElement('div');
+    tw.className = 'note-tags';
+    for (const t of note.tags) {
+      const span = document.createElement('span');
+      span.className = 'tag';
+      span.textContent = '# ' + t;
+      tw.appendChild(span);
+    }
+    node.appendChild(tw);
+  }
+
+  // favorite button
+  const fav = document.createElement('button');
+  fav.className = 'fav-btn';
+  fav.title = note.favorite ? '取消收藏' : '收藏';
+  fav.textContent = note.favorite ? '❤️' : '🤍';
+  fav.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const newFav = !note.favorite;
+    if (newFav) spawnHearts(fav);
+    const result = await apiUpdateNote(note.id, { favorite: newFav });
+    if (result) {
+      note.favorite = newFav;
+      await apiList(); render();
+    } else cuteToast('error', '更新失敗', 'error');
+  });
+  node.appendChild(fav);
+
+  // delete button
+  const del = document.createElement('button');
+  del.className = 'delete-btn';
+  del.title = '刪除筆記';
+  del.textContent = '🗑';
+  del.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!confirm('要刪除這則筆記嗎？')) return;
+    if (await apiDeleteNote(note.id)) {
+      cuteToast('deleted', '已刪除', 'ok');
+      await apiList(); render();
+    } else cuteToast('error', '刪除失敗', 'error');
+  });
+  node.appendChild(del);
+
+  node.addEventListener('click', () => openNoteEditor(note));
+  return node;
+}
+
 function toggleSelect(name, node) {
   if (state.selected.has(name)) {
     state.selected.delete(name);
@@ -499,6 +591,93 @@ function uploadOne(file, row) {
   });
 }
 
+// ---------- Note modal (create / edit) ----------
+const noteModal = $('#note-modal');
+const noteText = $('#note-text');
+const noteDate = $('#note-date');
+const noteTagsInput = $('#note-tags-input');
+const noteDeleteBtn = $('#note-delete-btn');
+const noteModalTitle = $('#note-modal-title');
+let editingNote = null;   // null = creating new
+
+function isoLocal(d) {
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function openNoteEditor(note = null) {
+  editingNote = note;
+  noteModalTitle.textContent = note ? '📝 編輯筆記' : '📝 寫筆記';
+  noteText.value = note ? note.text || '' : '';
+  if (note && note.captured_at) {
+    const d = new Date(note.captured_at);
+    noteDate.value = isNaN(d) ? isoLocal(new Date()) : isoLocal(d);
+  } else {
+    noteDate.value = isoLocal(new Date());
+  }
+  noteTagsInput.value = note ? (note.tags || []).join(', ') : '';
+  noteDeleteBtn.hidden = !note;
+  noteModal.hidden = false;
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => noteText.focus(), 50);
+}
+function closeNoteEditor() {
+  noteModal.hidden = true;
+  document.body.style.overflow = '';
+  editingNote = null;
+}
+function parseTagsInput(s) {
+  return s.split(/[,，]/).map(t => t.trim()).filter(Boolean);
+}
+
+$('#new-note-btn').addEventListener('click', () => openNoteEditor(null));
+$('#note-modal-close').addEventListener('click', closeNoteEditor);
+$('#note-cancel').addEventListener('click', closeNoteEditor);
+noteModal.addEventListener('click', (e) => { if (e.target === noteModal) closeNoteEditor(); });
+document.addEventListener('keydown', (e) => {
+  if (!noteModal.hidden && e.key === 'Escape') closeNoteEditor();
+});
+
+$('#note-save').addEventListener('click', async () => {
+  const text = noteText.value.trim();
+  if (!text) {
+    cuteToast('error', '寫點什麼吧 🐾', 'error');
+    noteText.focus();
+    return;
+  }
+  const payload = {
+    text,
+    captured_at: noteDate.value ? (noteDate.value.length === 16 ? noteDate.value + ':00' : noteDate.value) : '',
+    tags: parseTagsInput(noteTagsInput.value),
+  };
+  const ok = editingNote
+    ? await apiUpdateNote(editingNote.id, payload)
+    : await apiCreateNote(payload);
+  if (ok) {
+    cuteToast('saved', '已儲存 ✓', 'ok');
+    closeNoteEditor();
+    await apiList(); render();
+  } else cuteToast('error', '儲存失敗', 'error');
+});
+
+noteDeleteBtn.addEventListener('click', async () => {
+  if (!editingNote) return;
+  if (!confirm('要刪除這則筆記嗎？')) return;
+  if (await apiDeleteNote(editingNote.id)) {
+    cuteToast('deleted', '已刪除', 'ok');
+    closeNoteEditor();
+    await apiList(); render();
+  } else cuteToast('error', '刪除失敗', 'error');
+});
+
+// Ctrl/Cmd+Enter to save from within the textarea
+noteText.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault();
+    $('#note-save').click();
+  }
+});
+
 // ---------- Filter chips ----------
 $$('.chip').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -592,6 +771,14 @@ function currentLbItem() {
 function showLb() {
   const it = currentLbItem();
   if (!it) return closeLightbox();
+  // Notes have no visual content — never open them in the lightbox; the click
+  // handler in renderNote opens the editor modal instead. Guard here in case
+  // a stale URL hash references a note id.
+  if (it.kind === 'note') {
+    closeLightbox();
+    openNoteEditor(it);
+    return;
+  }
   lbContent.innerHTML = '';
   const cls = pickEnter();
   if (it.kind === 'image') {
