@@ -1277,7 +1277,17 @@ function ensurePolling() {
 }
 
 // ---------- Service worker (PWA install on iOS / Android) ----------
+// When a fresh SW takes over (after we ship a new VERSION), reload once so
+// the user sees the new app.js without having to clear cache or hard-refresh.
+// The `refreshing` flag prevents reload loops if multiple SWs activate.
 if ('serviceWorker' in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    toast('🔄 偵測到新版本，3 秒後自動更新…', 'ok');
+    setTimeout(() => window.location.reload(), 3000);
+  });
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.warn('SW register failed', err);
