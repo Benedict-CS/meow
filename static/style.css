@@ -1623,28 +1623,6 @@ body {
    on equal specificity.
    ========================================================== */
 
-/* ----- Skip link (keyboard a11y) — hidden until focused ----- */
-.skip-link {
-  position: fixed;
-  top: -100px;
-  left: 12px;
-  z-index: 1000;
-  background: var(--primary-dark);
-  color: var(--on-primary);
-  padding: 10px 16px;
-  border-radius: var(--radius-pill);
-  font: inherit;
-  font-weight: 600;
-  text-decoration: none;
-  box-shadow: var(--shadow-lg);
-  transition: top var(--motion-base) var(--ease-out);
-}
-.skip-link:focus,
-.skip-link:focus-visible {
-  top: 12px;
-  outline: none;
-}
-
 /* ----- Visually hidden (a11y label text, stays in accessibility tree) ----- */
 .visually-hidden {
   position: absolute !important;
@@ -2122,9 +2100,6 @@ body {
   .toast.error, .toast.danger { background: var(--danger); color: #2b0e0e; }
   .toast.info { background: var(--primary); color: var(--on-primary); }
 
-  /* Skip link contrast on dark */
-  .skip-link { color: var(--on-primary); }
-
   /* Scrollbars in dark */
   * { scrollbar-color: rgba(226, 154, 125, 0.45) transparent; }
   *::-webkit-scrollbar-thumb { background: rgba(226, 154, 125, 0.35); background-clip: padding-box; }
@@ -2155,7 +2130,6 @@ body {
   .modal,
   .lightbox,
   .toast,
-  .skip-link,
   .drop-zone,
   .upload-list,
   .item .delete-btn,
