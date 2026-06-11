@@ -4,7 +4,18 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#fef6ec" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="description" content="🐾 貓貓相簿 — 收集每一個喵喵瞬間。可以上傳照片、影片，加標籤、寫筆記、收藏最愛的可愛時刻。" />
   <title>🐾 貓貓相簿 · My Cat Album</title>
+
+  <!-- Open Graph / share previews -->
+  <meta property="og:title" content="🐾 貓貓相簿 · My Cat Album" />
+  <meta property="og:description" content="收集每一個喵喵瞬間 — 照片、影片、筆記與標籤。" />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="/static/apple-touch-icon.png" />
+  <meta property="og:locale" content="zh_TW" />
+  <meta name="twitter:card" content="summary" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Kalam:wght@400;700&display=swap" />
@@ -18,97 +29,106 @@
   <meta name="mobile-web-app-capable" content="yes" />
 </head>
 <body>
-  <nav class="topbar">
-    <a class="hero-corner" href="/trash" title="垃圾桶">🗑</a>
-    <a class="hero-corner" href="/disk" title="容量">📊</a>
+  <!-- Skip link: hidden until keyboard-focused; jumps past the topbar/hero straight to the gallery. -->
+  <a class="skip-link" href="#gallery">跳到相簿</a>
+
+  <nav class="topbar" role="navigation" aria-label="工具列">
+    <a class="hero-corner" href="/trash" title="垃圾桶" aria-label="垃圾桶">🗑</a>
+    <a class="hero-corner" href="/disk" title="容量" aria-label="儲存容量">📊</a>
   </nav>
-  <header class="hero">
+
+  <header class="hero" role="banner">
     <h1>🐾 貓貓相簿</h1>
-    <p class="subtitle">收集每一個喵喵瞬間</p>
+    <p class="subtitle">收集每一個喵喵瞬間 · <span lang="en">My Cat Album</span></p>
   </header>
 
-  <main>
+  <main role="main" id="main">
+    <!-- Visually-hidden label so screen readers know this hidden file input's purpose. -->
+    <label for="file-input" class="visually-hidden">選擇要上傳的照片或影片</label>
     <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
 
-    <div class="fab-dial" id="fab-dial">
-      <button class="fab-action" id="fab-action-note" type="button">
-        <span class="fab-action-icon">📝</span>
+    <div class="fab-dial" id="fab-dial" role="group" aria-label="新增項目">
+      <button class="fab-action" id="fab-action-note" type="button" aria-label="寫筆記">
+        <span class="fab-action-icon" aria-hidden="true">📝</span>
         <span>寫筆記</span>
       </button>
-      <button class="fab-action" id="fab-action-upload" type="button">
-        <span class="fab-action-icon">📷</span>
+      <button class="fab-action" id="fab-action-upload" type="button" aria-label="上傳照片或影片">
+        <span class="fab-action-icon" aria-hidden="true">📷</span>
         <span>上傳照片</span>
       </button>
-      <button class="fab-upload" id="fab-upload" title="新增" aria-label="新增" aria-expanded="false">
-        <span class="fab-plus">＋</span>
+      <button class="fab-upload" id="fab-upload" title="新增" aria-label="新增（展開選單）" aria-expanded="false" aria-haspopup="menu">
+        <span class="fab-plus" aria-hidden="true">＋</span>
       </button>
     </div>
 
-    <section class="toolbar">
-      <div class="counter">
+    <section class="toolbar" aria-label="篩選與搜尋">
+      <div class="counter" aria-live="polite" aria-atomic="true">
         <span id="count">0</span> / <span id="total-count">0</span> 個檔案
       </div>
 
-      <div class="search">
-        <input type="search" id="search" placeholder="🔍 搜尋檔名、描述、標籤…" />
+      <div class="search" role="search">
+        <label for="search" class="visually-hidden">搜尋檔名、描述或標籤</label>
+        <input type="search" id="search" placeholder="🔍 搜尋檔名、描述、標籤…" aria-label="搜尋檔名、描述或標籤" />
       </div>
 
-      <div class="filter" id="filter-chips">
-        <button class="chip active" data-filter="all">全部</button>
-        <button class="chip" data-filter="image">📷 照片</button>
-        <button class="chip" data-filter="video">🎬 影片</button>
-        <button class="chip" data-filter="note">📝 筆記</button>
-        <button class="chip" data-filter="favorite">❤️ 最愛</button>
+      <div class="filter" id="filter-chips" role="group" aria-label="類型篩選">
+        <button class="chip active" data-filter="all" type="button" aria-pressed="true">全部</button>
+        <button class="chip" data-filter="image" type="button" aria-pressed="false" aria-label="只看照片">📷 照片</button>
+        <button class="chip" data-filter="video" type="button" aria-pressed="false" aria-label="只看影片">🎬 影片</button>
+        <button class="chip" data-filter="note" type="button" aria-pressed="false" aria-label="只看筆記">📝 筆記</button>
+        <button class="chip" data-filter="favorite" type="button" aria-pressed="false" aria-label="只看最愛">❤️ 最愛</button>
       </div>
 
       <div class="actions">
-        <button class="btn-ghost" id="select-mode-btn" title="多選">☑️ 多選</button>
+        <button class="btn-ghost" id="select-mode-btn" type="button" title="進入多選模式" aria-label="進入多選模式">☑️ 多選</button>
       </div>
     </section>
 
-    <section id="tag-bar" class="tag-bar" hidden></section>
+    <nav id="tag-bar" class="tag-bar" hidden aria-label="標籤篩選"></nav>
 
-    <section id="select-bar" class="select-bar" hidden>
-      <span id="select-count">已選 0 個</span>
+    <section id="select-bar" class="select-bar" hidden role="region" aria-label="多選操作">
+      <span id="select-count" aria-live="polite">已選 0 個</span>
       <div class="select-actions">
-        <button class="btn-ghost" id="select-all-btn">全選</button>
-        <button class="btn-ghost" id="batch-fav-btn">❤️ 最愛</button>
-        <button class="btn-ghost" id="batch-tag-btn"># 加標籤</button>
-        <button class="btn-ghost" id="batch-date-btn">📅 改日期</button>
-        <button class="btn-danger" id="batch-delete-btn">🗑 刪除</button>
-        <button class="btn-ghost" id="select-cancel-btn">取消</button>
+        <button class="btn-ghost" id="select-all-btn" type="button">全選</button>
+        <button class="btn-ghost" id="batch-fav-btn" type="button" aria-label="批次切換最愛">❤️ 最愛</button>
+        <button class="btn-ghost" id="batch-tag-btn" type="button" aria-label="批次加標籤"># 加標籤</button>
+        <button class="btn-ghost" id="batch-date-btn" type="button" aria-label="批次改拍攝日期">📅 改日期</button>
+        <button class="btn-danger" id="batch-delete-btn" type="button" aria-label="批次刪除">🗑 刪除</button>
+        <button class="btn-ghost" id="select-cancel-btn" type="button">取消</button>
       </div>
     </section>
 
     <datalist id="all-tags"></datalist>
 
-    <section id="gallery" class="gallery">
-      <div class="empty-state" id="empty-state">
-        <div class="empty-emoji">🐱</div>
+    <section id="gallery" class="gallery" aria-label="相簿" tabindex="-1">
+      <div class="empty-state" id="empty-state" role="status" aria-live="polite">
+        <div class="empty-emoji" aria-hidden="true">🐱</div>
         <div class="empty-text">還沒有照片，上傳第一張喵喵照吧～</div>
       </div>
     </section>
   </main>
 
-  <div id="upload-modal" class="modal" hidden>
+  <!-- Upload modal (kept as plain <div> because app.js drives visibility via `.hidden`). -->
+  <div id="upload-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="upload-modal-title" hidden>
     <div class="modal-card">
-      <button class="modal-close" id="upload-modal-close" aria-label="關閉">✕</button>
-      <h2 class="modal-title">📸 上傳照片 / 影片</h2>
-      <div class="drop-zone" id="drop-zone">
-        <div class="drop-icon">🐱</div>
+      <button class="modal-close" id="upload-modal-close" type="button" aria-label="關閉上傳視窗">✕</button>
+      <h2 class="modal-title" id="upload-modal-title">📸 上傳照片 / 影片</h2>
+      <div class="drop-zone" id="drop-zone" role="button" tabindex="0" aria-label="拖放或點選檔案來上傳">
+        <div class="drop-icon" aria-hidden="true">🐱</div>
         <div class="drop-title">把檔案拖到這裡</div>
         <div class="drop-hint">或 <button class="link-btn" id="browse-btn" type="button">點這裡選檔案</button></div>
         <div class="drop-formats">JPG / PNG / GIF / WEBP / MP4 / WEBM / MOV · 一次可選多張 · 最多 500 MB</div>
       </div>
-      <div id="upload-list" class="upload-list" hidden></div>
+      <div id="upload-list" class="upload-list" hidden aria-live="polite" aria-label="上傳進度"></div>
     </div>
   </div>
 
-  <div id="ask-modal" class="modal" hidden>
+  <div id="ask-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="ask-modal-title" aria-describedby="ask-modal-desc" hidden>
     <div class="modal-card ask-modal-card">
-      <button class="modal-close" id="ask-modal-close" aria-label="關閉">✕</button>
+      <button class="modal-close" id="ask-modal-close" type="button" aria-label="關閉">✕</button>
       <h2 class="modal-title" id="ask-modal-title">提示</h2>
       <p class="ask-modal-desc" id="ask-modal-desc"></p>
+      <label for="ask-modal-input" class="visually-hidden">輸入內容</label>
       <input class="ask-modal-input" id="ask-modal-input" type="text" />
       <div class="ask-modal-actions">
         <button type="button" class="btn-ghost" id="ask-modal-cancel">取消</button>
@@ -117,55 +137,59 @@
     </div>
   </div>
 
-  <div id="note-modal" class="modal" hidden>
+  <div id="note-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="note-modal-title" hidden>
     <div class="modal-card note-modal-card">
-      <button class="modal-close" id="note-modal-close" aria-label="關閉">✕</button>
+      <button class="modal-close" id="note-modal-close" type="button" aria-label="關閉筆記編輯器">✕</button>
       <h2 class="modal-title" id="note-modal-title">📝 寫筆記</h2>
       <div class="note-form">
-        <textarea id="note-text" placeholder="今天的喵喵故事…&#10;&#10;例如：今天給他取名叫探吉 🐱" maxlength="2000"></textarea>
-        <label class="note-field">
+        <label for="note-text" class="visually-hidden">筆記內容</label>
+        <textarea id="note-text" placeholder="今天的喵喵故事…&#10;&#10;例如：今天給他取名叫探吉 🐱" maxlength="2000" aria-label="筆記內容"></textarea>
+        <label class="note-field" for="note-date">
           <span>日期</span>
           <input type="datetime-local" id="note-date" />
         </label>
-        <label class="note-field">
+        <label class="note-field" for="note-tags-input">
           <span>標籤</span>
           <input type="text" id="note-tags-input" list="all-tags" placeholder="逗號分隔，如：探吉, 命名" />
         </label>
         <div class="note-form-actions">
-          <button type="button" class="btn-ghost" id="note-delete-btn" hidden>🗑 刪除</button>
+          <button type="button" class="btn-ghost" id="note-delete-btn" hidden aria-label="刪除這則筆記">🗑 刪除</button>
           <span class="note-form-spacer"></span>
           <button type="button" class="btn-ghost" id="note-cancel">取消</button>
-          <button type="button" class="btn-primary" id="note-save">✓ 儲存</button>
+          <button type="button" class="btn-primary" id="note-save" title="儲存（Ctrl/Cmd + Enter）">✓ 儲存</button>
         </div>
       </div>
     </div>
   </div>
 
-  <div id="lightbox" class="lightbox" hidden>
-    <button class="lb-close" aria-label="關閉，回到相簿"><span>✕</span><span class="lb-close-txt">回到相簿</span></button>
-    <button class="lb-prev" aria-label="上一張">‹</button>
-    <button class="lb-next" aria-label="下一張">›</button>
-    <button class="lb-slideshow" id="lb-slideshow" aria-label="播放投影片">▶</button>
-    <button class="lb-download" id="lb-download" aria-label="下載原檔" title="下載原檔">⤓</button>
-    <button class="lb-share" id="lb-share" aria-label="分享連結" title="分享連結">🔗</button>
-    <button class="lb-fav" id="lb-fav" aria-label="收藏">♡</button>
+  <!-- Lightbox: keyboard shortcuts — ←/→ navigate, Space play/pause, F favorite, D download, S share, Esc close. -->
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-labelledby="lb-caption-display" aria-label="照片檢視器" hidden>
+    <button class="lb-close" type="button" aria-label="關閉，回到相簿（Esc）"><span aria-hidden="true">✕</span><span class="lb-close-txt">回到相簿</span></button>
+    <button class="lb-prev" type="button" aria-label="上一張（左方向鍵）">‹</button>
+    <button class="lb-next" type="button" aria-label="下一張（右方向鍵）">›</button>
+    <button class="lb-slideshow" id="lb-slideshow" type="button" aria-label="播放投影片（空白鍵）">▶</button>
+    <button class="lb-download" id="lb-download" type="button" aria-label="下載原檔（D）" title="下載原檔">⤓</button>
+    <button class="lb-share" id="lb-share" type="button" aria-label="分享連結（S）" title="分享連結">🔗</button>
+    <button class="lb-fav" id="lb-fav" type="button" aria-label="收藏（F）">♡</button>
     <div class="lb-content" id="lb-content"></div>
     <div class="lb-meta">
       <div class="lb-caption-area" id="lb-caption-area">
-        <div class="lb-caption-text" id="lb-caption-display"></div>
-        <textarea id="lb-caption-edit" placeholder="寫一句描述…  (Ctrl+Enter 儲存，Esc 取消)" maxlength="500" hidden></textarea>
+        <div class="lb-caption-text" id="lb-caption-display" role="button" tabindex="0" aria-label="描述（點此編輯）"></div>
+        <label for="lb-caption-edit" class="visually-hidden">編輯描述</label>
+        <textarea id="lb-caption-edit" placeholder="寫一句描述…  (Ctrl+Enter 儲存，Esc 取消)" maxlength="500" hidden aria-label="編輯描述"></textarea>
         <div class="lb-caption-actions" id="lb-caption-actions" hidden>
           <button type="button" class="lb-btn-cancel" id="lb-caption-cancel">取消</button>
           <button type="button" class="lb-btn-save" id="lb-caption-save">✓ 儲存</button>
         </div>
       </div>
-      <div class="lb-tags" id="lb-tags"></div>
+      <div class="lb-tags" id="lb-tags" role="list" aria-label="標籤"></div>
       <div class="lb-date" id="lb-date"></div>
+      <label for="lb-date-edit" class="visually-hidden">編輯拍攝時間</label>
       <input type="datetime-local" id="lb-date-edit" hidden />
     </div>
   </div>
 
-  <div id="toast" class="toast" hidden></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true" hidden></div>
 
   <script src="/static/app.js"></script>
 </body>

@@ -1,18 +1,68 @@
 {
-  "name": "貓貓相簿",
-  "short_name": "貓貓",
-  "description": "收集每一個喵喵瞬間",
+  "id": "/",
+  "name": "貓貓相簿 · Meow Gallery",
+  "short_name": "貓貓相簿",
+  "description": "收集每一個喵喵瞬間 — 私人貓咪照片與筆記相簿",
+  "lang": "zh-Hant",
+  "dir": "ltr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#fef6ec",
   "theme_color": "#fef6ec",
-  "lang": "zh-Hant",
+  "categories": ["photo", "lifestyle", "entertainment"],
   "icons": [
-    { "src": "/static/icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any maskable" },
-    { "src": "/static/icon-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any" },
-    { "src": "/static/icon-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any" },
-    { "src": "/static/icon-512-maskable.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+    {
+      "src": "/static/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/icon-512-maskable.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/static/apple-touch-icon.png",
+      "type": "image/png",
+      "sizes": "180x180",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "容量資訊",
+      "short_name": "容量",
+      "description": "查看磁碟使用量",
+      "url": "/disk",
+      "icons": [
+        { "src": "/static/icon-192.png", "type": "image/png", "sizes": "192x192" }
+      ]
+    },
+    {
+      "name": "垃圾桶",
+      "short_name": "垃圾桶",
+      "description": "查看與還原已刪除的喵喵照片",
+      "url": "/trash",
+      "icons": [
+        { "src": "/static/icon-192.png", "type": "image/png", "sizes": "192x192" }
+      ]
+    }
   ]
 }

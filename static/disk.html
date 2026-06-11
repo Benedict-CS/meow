@@ -11,20 +11,67 @@
   <link rel="stylesheet" href="/static/disk.css" />
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
-  <meta name="theme-color" content="#fef6ec" />
+  <meta name="theme-color" content="#fef6ec" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#241b15" media="(prefers-color-scheme: dark)" />
 </head>
 <body>
+  <a class="skip-link" href="#stats">跳到內容</a>
+
   <header class="hero">
+    <nav class="topbar" aria-label="頁面導覽">
+      <a class="hero-corner back-corner" href="/" aria-label="回到相簿首頁" title="回相簿">←</a>
+      <button
+        class="hero-corner refresh-corner"
+        type="button"
+        id="refresh-btn"
+        aria-label="重新整理容量資料"
+        title="重新整理"
+      >↻</button>
+    </nav>
     <h1>📊 容量</h1>
     <p class="subtitle">看看相簿吃了多少</p>
   </header>
 
-  <main class="disk-main">
-    <a class="back-link" href="/">← 回相簿</a>
-    <div id="stats" class="stats-grid">
-      <div class="loading">🐾 載入中…</div>
+  <main class="disk-main" id="main">
+    <a class="back-link" href="/">
+      <span class="back-arrow" aria-hidden="true">←</span>
+      <span>回相簿</span>
+    </a>
+
+    <div
+      id="stats"
+      class="stats-grid"
+      role="region"
+      aria-label="容量統計"
+      aria-live="polite"
+      aria-busy="true"
+    >
+      <!-- Skeleton placeholders -->
+      <section class="card skeleton-card" aria-hidden="true">
+        <div class="skel skel-title"></div>
+        <div class="skel skel-row"></div>
+        <div class="skel skel-row"></div>
+        <div class="skel skel-row"></div>
+      </section>
+      <section class="card skeleton-card" aria-hidden="true">
+        <div class="skel skel-title"></div>
+        <div class="skel skel-row"></div>
+        <div class="skel skel-row"></div>
+        <div class="skel skel-row"></div>
+      </section>
+      <section class="card skeleton-card" aria-hidden="true">
+        <div class="skel skel-title"></div>
+        <div class="skel skel-bar"></div>
+        <div class="skel skel-row"></div>
+        <div class="skel skel-row"></div>
+      </section>
+      <p class="loading" role="status">
+        <span class="paw-spin" aria-hidden="true">🐾</span>
+        <span>載入中…</span>
+      </p>
     </div>
-    <p class="footnote" id="updated"></p>
+
+    <p class="footnote" id="updated" aria-live="polite"></p>
   </main>
 
   <script src="/static/disk.js"></script>
