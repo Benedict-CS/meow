@@ -29,9 +29,6 @@
   <meta name="mobile-web-app-capable" content="yes" />
 </head>
 <body>
-  <!-- Skip link: hidden until keyboard-focused; jumps past the topbar/hero straight to the gallery. -->
-  <a class="skip-link" href="#gallery">跳到相簿</a>
-
   <nav class="topbar" role="navigation" aria-label="工具列">
     <a class="hero-corner" href="/trash" title="垃圾桶" aria-label="垃圾桶">🗑</a>
     <a class="hero-corner" href="/disk" title="容量" aria-label="儲存容量">📊</a>
@@ -43,8 +40,6 @@
   </header>
 
   <main role="main" id="main">
-    <!-- Visually-hidden label so screen readers know this hidden file input's purpose. -->
-    <label for="file-input" class="visually-hidden">選擇要上傳的照片或影片</label>
     <input id="file-input" type="file" accept="image/*,video/*" multiple hidden />
 
     <div class="fab-dial" id="fab-dial" role="group" aria-label="新增項目">
@@ -67,8 +62,7 @@
       </div>
 
       <div class="search" role="search">
-        <label for="search" class="visually-hidden">搜尋檔名、描述或標籤</label>
-        <input type="search" id="search" placeholder="🔍 搜尋檔名、描述、標籤…" aria-label="搜尋檔名、描述或標籤" />
+        <input type="search" id="search" placeholder="🔍 搜尋檔名、描述、標籤…" />
       </div>
 
       <div class="filter" id="filter-chips" role="group" aria-label="類型篩選">
