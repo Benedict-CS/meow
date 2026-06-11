@@ -10,4 +10,10 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/data
+      # Bind-mount static assets so HTML/CSS/JS edits ship via a plain
+      # `git pull && docker compose restart cat-gallery` — no rebuild
+      # needed for front-end changes. Read-only because the server
+      # never writes here. The Dockerfile still COPYs static/ in, so
+      # the image stays self-contained when run without compose.
+      - ./static:/app/static:ro
     restart: unless-stopped
