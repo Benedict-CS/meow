@@ -20,16 +20,72 @@ const MONTH_NAMES_ZH = [
   '7 月', '8 月', '9 月', '10 月', '11 月', '12 月',
 ];
 
+// ---------- Reduced-motion preference ----------
+// Cheap to query once; CSS already handles its own rules, but JS-driven
+// animations (heart burst, lightbox enter classes) should also respect it.
+const prefersReducedMotion = (() => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch { return false; }
+})();
+
 // ---------- Toast ----------
+// Severity: '' | 'ok' | 'error' | 'info'.
+// Optional `action` shows an inline button (e.g. "Undo") whose handler fires
+// when clicked. Hovering the toast pauses auto-dismiss so users can read /
+// click the action without it disappearing under the cursor.
 let toastTimer;
-function toast(msg, kind = '') {
+let toastDeadline = 0;
+let toastRemaining = 0;
+function toast(msg, kind = '', opts = {}) {
   const el = $('#toast');
-  el.textContent = msg;
+  const duration = opts.duration ?? (opts.action ? 5000 : 2400);
+  el.innerHTML = '';
+  const span = document.createElement('span');
+  span.className = 'toast-msg';
+  span.textContent = msg;
+  el.appendChild(span);
+  if (opts.action && typeof opts.action.onClick === 'function') {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'toast-action';
+    btn.textContent = opts.action.label || '復原';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      try { opts.action.onClick(); } finally { hideToast(); }
+    });
+    el.appendChild(btn);
+  }
   el.className = 'toast ' + kind;
+  el.setAttribute('role', kind === 'error' ? 'alert' : 'status');
+  el.setAttribute('aria-live', kind === 'error' ? 'assertive' : 'polite');
   el.hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+  toastRemaining = duration;
+  toastDeadline = Date.now() + duration;
+  toastTimer = setTimeout(hideToast, duration);
 }
+function hideToast() {
+  clearTimeout(toastTimer);
+  toastTimer = null;
+  const el = $('#toast');
+  if (el) el.hidden = true;
+}
+// Pause auto-dismiss while pointer is over the toast.
+(function wireToastHover() {
+  const el = $('#toast');
+  if (!el) return;
+  el.addEventListener('mouseenter', () => {
+    if (!toastTimer) return;
+    toastRemaining = Math.max(800, toastDeadline - Date.now());
+    clearTimeout(toastTimer);
+    toastTimer = null;
+  });
+  el.addEventListener('mouseleave', () => {
+    if (el.hidden || toastTimer) return;
+    toastDeadline = Date.now() + toastRemaining;
+    toastTimer = setTimeout(hideToast, toastRemaining);
+  });
+})();
 
 // Cute toast — pick a random phrase from a category.
 const PHRASES = {
@@ -48,6 +104,7 @@ function cuteToast(key, fallback, kind = '') {
 
 // ---------- Heart burst (clicking ❤️) ----------
 function spawnHearts(originEl) {
+  if (prefersReducedMotion) return;  // user opted out of decorative motion
   const r = originEl.getBoundingClientRect();
   const cx = r.left + r.width / 2;
   const cy = r.top  + r.height / 2;
@@ -73,11 +130,83 @@ function spawnHearts(originEl) {
 // ---------- Lightbox enter transitions (random per slide) ----------
 const ENTER_CLASSES = ['enter-fade', 'enter-right', 'enter-left', 'enter-zoom', 'enter-up'];
 function pickEnter() {
+  if (prefersReducedMotion) return 'enter-fade';  // shortest, least motion
   return ENTER_CLASSES[Math.floor(Math.random() * ENTER_CLASSES.length)];
 }
 const SLIDESHOW_MS = 2000;
 
+// ---------- Focus management ----------
+// Each open modal pushes onto this stack; the top entry's `restore` is what
+// receives focus when that modal closes. Lets nested modals (ask inside note,
+// etc.) restore focus correctly without clobbering each other.
+const _focusStack = [];
+const FOCUSABLE_SEL = [
+  'a[href]', 'button:not([disabled])', 'input:not([disabled])',
+  'select:not([disabled])', 'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])', '[contenteditable="true"]',
+].join(',');
+function focusableIn(container) {
+  return [...container.querySelectorAll(FOCUSABLE_SEL)]
+    .filter(el => !el.hidden && el.offsetParent !== null);
+}
+// Trap Tab/Shift+Tab inside `container` until released. Returns a release fn.
+function trapFocus(container, opts = {}) {
+  const restore = opts.restore || document.activeElement;
+  const handler = (e) => {
+    if (e.key !== 'Tab') return;
+    const f = focusableIn(container);
+    if (!f.length) { e.preventDefault(); container.focus?.(); return; }
+    const first = f[0], last = f[f.length - 1];
+    const active = document.activeElement;
+    if (e.shiftKey && (active === first || !container.contains(active))) {
+      e.preventDefault(); last.focus();
+    } else if (!e.shiftKey && (active === last || !container.contains(active))) {
+      e.preventDefault(); first.focus();
+    }
+  };
+  container.addEventListener('keydown', handler);
+  const entry = { container, handler, restore };
+  _focusStack.push(entry);
+  return () => {
+    const i = _focusStack.indexOf(entry);
+    if (i >= 0) _focusStack.splice(i, 1);
+    container.removeEventListener('keydown', handler);
+    if (restore && typeof restore.focus === 'function') {
+      try { restore.focus({ preventScroll: true }); } catch { restore.focus(); }
+    }
+  };
+}
+// Track open modals so a single Escape handler can close the topmost one
+// (avoids the stack of separate `keydown` listeners each filtering by .hidden).
+const _openModals = [];   // entries: { el, close }
+function registerModal(el, closeFn) {
+  const entry = { el, close: closeFn };
+  _openModals.push(entry);
+  return () => {
+    const i = _openModals.indexOf(entry);
+    if (i >= 0) _openModals.splice(i, 1);
+  };
+}
+// Body-scroll lock counter: many things can lock simultaneously (modal +
+// lightbox via deep-link); only release when the last one unlocks.
+let _scrollLockCount = 0;
+function lockBodyScroll() {
+  _scrollLockCount++;
+  document.body.style.overflow = 'hidden';
+}
+function unlockBodyScroll() {
+  _scrollLockCount = Math.max(0, _scrollLockCount - 1);
+  if (_scrollLockCount === 0) document.body.style.overflow = '';
+}
+
 // ---------- Helpers ----------
+// Auto-resize a textarea to fit its content (capped at 60vh). Idempotent; safe
+// to call on every input. Defined up here so anything in the file can use it.
+function autoGrowTextarea(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = Math.min(ta.scrollHeight + 2, window.innerHeight * 0.6) + 'px';
+}
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
@@ -109,15 +238,23 @@ function monthLabel(key) {
 }
 
 // ---------- API ----------
-async function apiList() {
+async function apiList(opts = {}) {
   try {
     const r = await fetch('/api/list', { cache: 'no-store' });
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const data = await r.json();
     state.items = data.items || [];
+    return true;
   } catch (e) {
     console.warn('apiList failed', e);
-    toast('載入相簿失敗 — 再試一次？', 'error');
+    // Show a retry toast only for explicit user-initiated refreshes; silent
+    // background polls (ensurePolling) shouldn't nag.
+    if (!opts.silent) {
+      toast('載入相簿失敗 — 再試一次？', 'error', {
+        action: { label: '重試', onClick: () => { apiList().then(render); } },
+      });
+    }
+    return false;
   }
 }
 async function apiPatchMeta(name, patch) {
@@ -131,6 +268,11 @@ async function apiPatchMeta(name, patch) {
 }
 async function apiDelete(name) {
   const r = await fetch('/api/delete?file=' + encodeURIComponent(name), { method: 'DELETE' });
+  return r.ok;
+}
+async function apiRestore(name) {
+  // Server soft-deletes into a trash bucket; /api/restore pulls it back.
+  const r = await fetch('/api/restore?file=' + encodeURIComponent(name), { method: 'POST' });
   return r.ok;
 }
 async function apiBatchDelete(names) {
@@ -209,8 +351,11 @@ function render() {
   if (tags.length) {
     for (const [tag, count] of tags) {
       const chip = document.createElement('button');
-      chip.className = 'tag-chip' + (state.activeTag === tag ? ' active' : '');
+      const isActive = state.activeTag === tag;
+      chip.className = 'tag-chip' + (isActive ? ' active' : '');
+      chip.type = 'button';
       chip.textContent = `# ${tag} · ${count}`;
+      chip.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       chip.addEventListener('click', () => {
         state.activeTag = (state.activeTag === tag) ? null : tag;
         render();
@@ -382,7 +527,18 @@ function renderItem(it, idx) {
     if (state.selectMode) return;
     if (!confirm(`真的要刪除「${it.name}」嗎？`)) return;
     if (await apiDelete(it.name)) {
-      cuteToast('deleted', '已刪除', 'ok');
+      const name = it.name;
+      toast('已刪除 🗑', 'ok', {
+        action: {
+          label: '復原',
+          onClick: async () => {
+            if (await apiRestore(name)) {
+              toast('已復原 ✓', 'ok');
+              await apiList(); render();
+            } else toast('復原失敗', 'error');
+          },
+        },
+      });
       await apiList(); render();
     } else cuteToast('error', '刪除失敗', 'error');
   });
@@ -405,6 +561,18 @@ function renderItem(it, idx) {
       toggleSelect(it.name, node);
     } else {
       openLightbox(idx);
+    }
+  });
+  // Keyboard activation: Enter / Space to open lightbox (or toggle select).
+  node.tabIndex = 0;
+  node.setAttribute('role', 'button');
+  node.setAttribute('aria-label', it.caption ? `${it.caption}` : `${it.name}`);
+  node.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      node.click();
+    } else {
+      handleGalleryArrow(e, node);
     }
   });
 
@@ -476,7 +644,18 @@ function renderNote(note, idx) {
     e.stopPropagation();
     if (!confirm('要刪除這則筆記嗎？')) return;
     if (await apiDeleteNote(note.id)) {
-      cuteToast('deleted', '已刪除', 'ok');
+      const id = note.id;
+      toast('已刪除 🗑', 'ok', {
+        action: {
+          label: '復原',
+          onClick: async () => {
+            if (await apiRestore(id)) {
+              toast('已復原 ✓', 'ok');
+              await apiList(); render();
+            } else toast('復原失敗', 'error');
+          },
+        },
+      });
       await apiList(); render();
     } else cuteToast('error', '刪除失敗', 'error');
   });
@@ -489,7 +668,56 @@ function renderNote(note, idx) {
       openNoteEditor(note);
     }
   });
+  node.tabIndex = 0;
+  node.setAttribute('role', 'button');
+  node.setAttribute('aria-label', note.text ? note.text.slice(0, 60) : '空筆記');
+  node.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      node.click();
+    } else {
+      handleGalleryArrow(e, node);
+    }
+  });
   return node;
+}
+
+// Arrow-key navigation across gallery items. Estimates the per-row stride by
+// looking at item top offsets so vertical arrows roughly move one row.
+function handleGalleryArrow(e, node) {
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) return;
+  const cells = $$('#gallery .item');
+  if (!cells.length) return;
+  const idx = cells.indexOf(node);
+  if (idx < 0) return;
+  let next = idx;
+  if (e.key === 'ArrowLeft')      next = Math.max(0, idx - 1);
+  else if (e.key === 'ArrowRight') next = Math.min(cells.length - 1, idx + 1);
+  else if (e.key === 'Home')      next = 0;
+  else if (e.key === 'End')       next = cells.length - 1;
+  else {
+    // Vertical: find the first cell on the next/prev row whose horizontal
+    // center is closest to ours.
+    const r = node.getBoundingClientRect();
+    const myCenter = r.left + r.width / 2;
+    const myTop = r.top;
+    let best = -1, bestDx = Infinity;
+    for (let i = 0; i < cells.length; i++) {
+      if (i === idx) continue;
+      const cr = cells[i].getBoundingClientRect();
+      const verticalOK = e.key === 'ArrowDown' ? cr.top > myTop + 4 : cr.top < myTop - 4;
+      if (!verticalOK) continue;
+      const dx = Math.abs(cr.left + cr.width / 2 - myCenter);
+      // Prefer same-row-band candidates first (closest top), then dx.
+      const score = Math.abs(cr.top - myTop) * 1.5 + dx;
+      if (score < bestDx) { bestDx = score; best = i; }
+    }
+    if (best >= 0) next = best;
+  }
+  if (next !== idx) {
+    e.preventDefault();
+    cells[next].focus({ preventScroll: false });
+  }
 }
 
 function toggleSelect(name, node) {
@@ -509,20 +737,44 @@ const fileInput = $('#file-input');
 const uploadList = $('#upload-list');
 
 const uploadModal = $('#upload-modal');
+let _releaseUploadTrap = null;
+let _releaseUploadModal = null;
 
 function openUploadModal() {
+  if (!uploadModal.hidden) return;
   uploadModal.hidden = false;
-  document.body.style.overflow = 'hidden';
+  lockBodyScroll();
+  const card = uploadModal.querySelector('.modal-card') || uploadModal;
+  const restore = document.activeElement;
+  _releaseUploadTrap = trapFocus(card, { restore });
+  _releaseUploadModal = registerModal(uploadModal, closeUploadModal);
+  // Drop zone is the primary CTA — focus it so Enter/Space triggers the picker.
+  setTimeout(() => {
+    (dropZone || card).focus?.();
+  }, 50);
 }
 function closeUploadModal() {
+  if (uploadModal.hidden) return;
   uploadModal.hidden = true;
-  document.body.style.overflow = '';
+  unlockBodyScroll();
   uploadList.hidden = true;
   uploadList.innerHTML = '';
+  if (_releaseUploadModal) { _releaseUploadModal(); _releaseUploadModal = null; }
+  if (_releaseUploadTrap)  { _releaseUploadTrap();  _releaseUploadTrap  = null; }
 }
 
 $('#browse-btn').addEventListener('click', (e) => { e.stopPropagation(); fileInput.click(); });
 dropZone.addEventListener('click', () => fileInput.click());
+// Make the drop-zone a real keyboard target: Enter / Space opens the picker.
+if (!dropZone.hasAttribute('tabindex')) dropZone.setAttribute('tabindex', '0');
+dropZone.setAttribute('role', 'button');
+dropZone.setAttribute('aria-label', '點擊或拖曳檔案到此處上傳');
+dropZone.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    fileInput.click();
+  }
+});
 
 // ---------- FAB speed-dial (＋ → 📷 上傳 / 📝 寫筆記) ----------
 const fabDial = $('#fab-dial');
@@ -557,27 +809,87 @@ $('#fab-action-note').addEventListener('click', () => {
   closeFabDial();
   openNoteEditor(null);
 });
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && fabDial.classList.contains('open')) closeFabDial();
-});
 
+// ---------- Global Escape ----------
+// Single Escape handler: closes the top of the modal stack first, then the
+// FAB dial. The lightbox registers as a modal too, so its Esc handling is
+// covered here and the per-key handler below skips Escape.
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  // While editing an inline field, let local handlers (caption cancel, etc.)
+  // run first; they call preventDefault.
+  if (e.defaultPrevented) return;
+  if (_openModals.length) {
+    const top = _openModals[_openModals.length - 1];
+    try { top.close(); } catch (err) { console.warn('Esc close failed', err); }
+    e.preventDefault();
+    return;
+  }
+  if (fabDial.classList.contains('open')) {
+    closeFabDial();
+    e.preventDefault();
+  }
+});
 $('#upload-modal-close').addEventListener('click', closeUploadModal);
 uploadModal.addEventListener('click', (e) => {
   if (e.target === uploadModal) closeUploadModal();
 });
-document.addEventListener('keydown', (e) => {
-  if (!uploadModal.hidden && e.key === 'Escape') closeUploadModal();
-});
 fileInput.addEventListener('change', () => { handleFiles(fileInput.files); fileInput.value = ''; });
 
+// Hint about file count + filter rejection during drag, before the drop.
+const ACCEPTED_RE = /^(image|video)\//;
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024;  // matches the modal copy
+
 ['dragenter', 'dragover'].forEach(ev =>
-  dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.add('dragover'); }));
+  dropZone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+    // dataTransfer.items is available during drag (file metadata, not contents);
+    // give the user a live count of valid candidates.
+    const items = e.dataTransfer?.items;
+    if (items && items.length) {
+      let total = 0, valid = 0;
+      for (const it of items) {
+        if (it.kind !== 'file') continue;
+        total++;
+        if (!it.type || ACCEPTED_RE.test(it.type)) valid++;
+      }
+      dropZone.dataset.dragCount = String(total);
+      const hint = dropZone.querySelector('.drop-title');
+      if (hint) {
+        hint._origText ??= hint.textContent;
+        if (total === valid) hint.textContent = `放開以上傳 ${total} 個檔案`;
+        else hint.textContent = `${valid} / ${total} 個檔案可接受（其餘會被略過）`;
+      }
+    }
+  }));
 ['dragleave', 'drop'].forEach(ev =>
-  dropZone.addEventListener(ev, (e) => { e.preventDefault(); dropZone.classList.remove('dragover'); }));
+  dropZone.addEventListener(ev, (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const hint = dropZone.querySelector('.drop-title');
+    if (hint?._origText) { hint.textContent = hint._origText; }
+  }));
 dropZone.addEventListener('drop', (e) => handleFiles(e.dataTransfer.files));
 
 function handleFiles(fileList) {
-  const files = [...fileList];
+  const all = [...fileList];
+  if (!all.length) return;
+  // Filter out rejects up-front so the user sees one consolidated warning
+  // instead of N inline "失敗" rows for the same root cause.
+  const files = [];
+  let rejectedType = 0, rejectedSize = 0;
+  for (const f of all) {
+    if (f.type && !ACCEPTED_RE.test(f.type)) { rejectedType++; continue; }
+    if (f.size && f.size > MAX_UPLOAD_BYTES) { rejectedSize++; continue; }
+    files.push(f);
+  }
+  if (rejectedType || rejectedSize) {
+    const parts = [];
+    if (rejectedType) parts.push(`${rejectedType} 個格式不支援`);
+    if (rejectedSize) parts.push(`${rejectedSize} 個超過 500 MB`);
+    toast(`略過 ${parts.join('、')}`, 'error');
+  }
   if (!files.length) return;
   uploadList.hidden = false;
   let done = 0;
@@ -673,6 +985,8 @@ function isoLocal(d) {
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+let _releaseNoteTrap = null;
+let _releaseNoteModal = null;
 function openNoteEditor(note = null) {
   editingNote = note;
   noteModalTitle.textContent = note ? '📝 編輯筆記' : '📝 寫筆記';
@@ -685,15 +999,28 @@ function openNoteEditor(note = null) {
   }
   noteTagsInput.value = note ? (note.tags || []).join(', ') : '';
   noteDeleteBtn.hidden = !note;
-  noteModal.hidden = false;
-  document.body.style.overflow = 'hidden';
-  setTimeout(() => noteText.focus(), 50);
+  if (noteModal.hidden) {
+    noteModal.hidden = false;
+    lockBodyScroll();
+    const card = noteModal.querySelector('.modal-card') || noteModal;
+    const restore = document.activeElement;
+    _releaseNoteTrap = trapFocus(card, { restore });
+    _releaseNoteModal = registerModal(noteModal, closeNoteEditor);
+  }
+  // Auto-grow + focus the textarea on the next frame.
+  autoGrowTextarea(noteText);
+  setTimeout(() => { noteText.focus(); noteText.select?.(); }, 50);
 }
 function closeNoteEditor() {
+  if (noteModal.hidden) return;
   noteModal.hidden = true;
-  document.body.style.overflow = '';
+  unlockBodyScroll();
   editingNote = null;
+  if (_releaseNoteModal) { _releaseNoteModal(); _releaseNoteModal = null; }
+  if (_releaseNoteTrap)  { _releaseNoteTrap();  _releaseNoteTrap  = null; }
 }
+// Live-resize the note textarea as the user types (helper is defined up top).
+noteText.addEventListener('input', () => autoGrowTextarea(noteText));
 function parseTagsInput(s) {
   return s.split(/[,，]/).map(t => t.trim()).filter(Boolean);
 }
@@ -702,9 +1029,6 @@ function parseTagsInput(s) {
 $('#note-modal-close').addEventListener('click', closeNoteEditor);
 $('#note-cancel').addEventListener('click', closeNoteEditor);
 noteModal.addEventListener('click', (e) => { if (e.target === noteModal) closeNoteEditor(); });
-document.addEventListener('keydown', (e) => {
-  if (!noteModal.hidden && e.key === 'Escape') closeNoteEditor();
-});
 
 $('#note-save').addEventListener('click', async () => {
   const text = noteText.value.trim();
@@ -731,8 +1055,19 @@ $('#note-save').addEventListener('click', async () => {
 noteDeleteBtn.addEventListener('click', async () => {
   if (!editingNote) return;
   if (!confirm('要刪除這則筆記嗎？')) return;
-  if (await apiDeleteNote(editingNote.id)) {
-    cuteToast('deleted', '已刪除', 'ok');
+  const id = editingNote.id;
+  if (await apiDeleteNote(id)) {
+    toast('已刪除 🗑', 'ok', {
+      action: {
+        label: '復原',
+        onClick: async () => {
+          if (await apiRestore(id)) {
+            toast('已復原 ✓', 'ok');
+            await apiList(); render();
+          } else toast('復原失敗', 'error');
+        },
+      },
+    });
     closeNoteEditor();
     await apiList(); render();
   } else cuteToast('error', '刪除失敗', 'error');
@@ -747,14 +1082,33 @@ noteText.addEventListener('keydown', (e) => {
 });
 
 // ---------- Filter chips ----------
-$$('.chip').forEach(btn => {
+function syncChipAria() {
+  $$('.chip').forEach(c => {
+    const on = c.classList.contains('active');
+    c.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+$$('.chip').forEach((btn, _i, all) => {
+  btn.setAttribute('aria-pressed', btn.classList.contains('active') ? 'true' : 'false');
   btn.addEventListener('click', () => {
-    $$('.chip').forEach(c => c.classList.remove('active'));
+    all.forEach(c => c.classList.remove('active'));
     btn.classList.add('active');
     state.filter = btn.dataset.filter;
+    syncChipAria();
     render();
   });
+  // Left / Right arrow to walk between chips (standard toolbar pattern).
+  btn.addEventListener('keydown', (e) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const idx = all.indexOf(btn);
+    const next = e.key === 'ArrowRight'
+      ? all[(idx + 1) % all.length]
+      : all[(idx - 1 + all.length) % all.length];
+    next.focus();
+  });
 });
+syncChipAria();
 
 // ---------- Search ----------
 let searchTimer;
@@ -783,7 +1137,19 @@ $('#batch-delete-btn').addEventListener('click', async () => {
   const names = [...state.selected];
   const result = await apiBatchDelete(names);
   if (result) {
-    toast(`已刪除 ${result.deleted.length} 個`, 'ok');
+    const deleted = result.deleted || [];
+    toast(`已刪除 ${deleted.length} 個 🗑`, 'ok', {
+      action: deleted.length ? {
+        label: '復原',
+        onClick: async () => {
+          // Best-effort: restore each in parallel. /api/restore is per-file.
+          const results = await Promise.all(deleted.map(n => apiRestore(n).catch(() => false)));
+          const ok = results.filter(Boolean).length;
+          toast(ok === deleted.length ? `已復原 ${ok} 個 ✓` : `復原 ${ok} / ${deleted.length}`, ok ? 'ok' : 'error');
+          await apiList(); render();
+        },
+      } : undefined,
+    });
     exitSelectMode();
     await apiList(); render();
   } else {
@@ -797,12 +1163,14 @@ function enterSelectMode() {
   document.body.classList.add('select-mode');
   $('#select-bar').hidden = false;
   $('#select-count').textContent = `已選 0 個`;
+  $('#select-mode-btn')?.setAttribute('aria-pressed', 'true');
 }
 function exitSelectMode() {
   state.selectMode = false;
   state.selected.clear();
   document.body.classList.remove('select-mode');
   $('#select-bar').hidden = true;
+  $('#select-mode-btn')?.setAttribute('aria-pressed', 'false');
   render();
 }
 
@@ -816,19 +1184,37 @@ const lbFav = $('#lb-fav');
 const lbSlideshow = $('#lb-slideshow');
 const lbTags = $('#lb-tags');
 
+let _lbReturnFocus = null;
+let _releaseLbModal = null;
 function openLightbox(idx) {
   state.lbIndex = idx;
-  lb.hidden = false;
-  document.body.style.overflow = 'hidden';
+  const wasHidden = lb.hidden;
+  if (wasHidden) {
+    lb.hidden = false;
+    lockBodyScroll();
+    _lbReturnFocus = document.activeElement;
+    _releaseLbModal = registerModal(lb, closeLightbox);
+  }
   showLb();
+  // Only steal focus on the initial open — stepping between slides shouldn't
+  // pull focus from whatever the user is interacting with (e.g. tag input).
+  if (wasHidden) {
+    setTimeout(() => { $('.lb-close')?.focus({ preventScroll: true }); }, 30);
+  }
   syncStateToUrl();
 }
 function closeLightbox() {
+  if (lb.hidden) return;
   stopSlideshow();
   lb.hidden = true;
   lbContent.innerHTML = '';
   state.lbIndex = -1;
-  document.body.style.overflow = '';
+  unlockBodyScroll();
+  if (_releaseLbModal) { _releaseLbModal(); _releaseLbModal = null; }
+  if (_lbReturnFocus && typeof _lbReturnFocus.focus === 'function') {
+    try { _lbReturnFocus.focus({ preventScroll: true }); } catch { _lbReturnFocus.focus(); }
+    _lbReturnFocus = null;
+  }
   syncStateToUrl();
 }
 function currentLbItem() {
@@ -878,6 +1264,12 @@ function showLb() {
   }
   lbFav.textContent = it.favorite ? '❤️' : '♡';
   lbFav.classList.toggle('active', !!it.favorite);
+  lbFav.setAttribute('aria-pressed', it.favorite ? 'true' : 'false');
+  lbFav.setAttribute('aria-label', it.favorite ? '取消收藏' : '收藏');
+  // Slideshow button reflects current state for AT users.
+  if (lbSlideshow) {
+    lbSlideshow.setAttribute('aria-pressed', state.slideshowTimer ? 'true' : 'false');
+  }
   renderLbTags(it);
 }
 
@@ -889,8 +1281,13 @@ function startCaptionEdit() {
   lbCaptionDisplay.hidden = true;
   lbCaptionEdit.hidden = false;
   lbCaptionActions.hidden = false;
+  autoGrowTextarea(lbCaptionEdit);
   lbCaptionEdit.focus();
+  // Move cursor to end so users can keep typing on existing captions.
+  const v = lbCaptionEdit.value;
+  lbCaptionEdit.setSelectionRange?.(v.length, v.length);
 }
+lbCaptionEdit.addEventListener('input', () => autoGrowTextarea(lbCaptionEdit));
 async function commitCaptionEdit() {
   const it = currentLbItem();
   if (!it) return;
@@ -1089,6 +1486,8 @@ function startSlideshow() {
   lbSlideshow.classList.add('playing');
   lb.classList.add('playing');
   lbSlideshow.textContent = '⏸';
+  lbSlideshow.setAttribute('aria-pressed', 'true');
+  lbSlideshow.setAttribute('aria-label', '暫停投影片');
   state.slideshowTimer = setInterval(() => lbStep(1), SLIDESHOW_MS);
 }
 function stopSlideshow() {
@@ -1098,6 +1497,8 @@ function stopSlideshow() {
   lbSlideshow.classList.remove('playing');
   lb.classList.remove('playing');
   lbSlideshow.textContent = '▶';
+  lbSlideshow.setAttribute('aria-pressed', 'false');
+  lbSlideshow.setAttribute('aria-label', '播放投影片');
 }
 lbSlideshow.addEventListener('click', () => {
   if (state.slideshowTimer) stopSlideshow(); else startSlideshow();
@@ -1115,8 +1516,8 @@ document.addEventListener('keydown', (e) => {
   // don't intercept keys when user is typing in caption/tag input
   const tag = document.activeElement && document.activeElement.tagName;
   if (tag === 'TEXTAREA' || tag === 'INPUT') return;
-  if (e.key === 'Escape') closeLightbox();
-  else if (e.key === 'ArrowLeft') lbStep(-1);
+  // Escape is handled by the global modal-stack handler above.
+  if (e.key === 'ArrowLeft') lbStep(-1);
   else if (e.key === 'ArrowRight') lbStep(1);
   else if (e.key === ' ') { e.preventDefault(); if (state.slideshowTimer) stopSlideshow(); else startSlideshow(); }
   else if (e.key === 'f' || e.key === 'F') lbFav.click();
@@ -1145,17 +1546,24 @@ function askModal({ title = '輸入', desc = '', inputType = 'text', placeholder
     _askEl.input.placeholder = placeholder;
     _askEl.input.value = initial;
     _askEl.modal.hidden = false;
-    document.body.style.overflow = 'hidden';
-    setTimeout(() => _askEl.input.focus(), 50);
+    lockBodyScroll();
+    setTimeout(() => { _askEl.input.focus(); _askEl.input.select?.(); }, 50);
+    // Trap focus inside ask card and register as a modal for global Esc.
+    const card = _askEl.modal.querySelector('.modal-card') || _askEl.modal;
+    const restore = document.activeElement;
+    const releaseTrap = trapFocus(card, { restore });
+    let unregister = registerModal(_askEl.modal, () => cleanup(null));
 
     const cleanup = (val) => {
       _askEl.modal.hidden = true;
-      document.body.style.overflow = '';
+      unlockBodyScroll();
       _askEl.ok.onclick = null;
       _askEl.cancel.onclick = null;
       _askEl.close.onclick = null;
       _askEl.modal.onclick = null;
       _askEl.input.onkeydown = null;
+      if (unregister) { unregister(); unregister = null; }
+      releaseTrap();
       resolve(val);
     };
     const submit = () => {
@@ -1325,6 +1733,7 @@ function applyUrlState() {
     state.activeTag = params.get('tag') || null;
     state.search = params.get('q') || '';
     $$('.chip').forEach(c => c.classList.toggle('active', c.dataset.filter === state.filter));
+    syncChipAria();
     $('#search').value = state.search;
     render();
     const v = params.get('v');
@@ -1336,10 +1745,7 @@ function applyUrlState() {
           // Notes open the editor, not the lightbox — avoid the flash.
           openNoteEditor(items[i]);
         } else {
-          state.lbIndex = i;
-          lb.hidden = false;
-          document.body.style.overflow = 'hidden';
-          showLb();
+          openLightbox(i);
         }
       }
     } else if (!lb.hidden) {
@@ -1356,7 +1762,9 @@ function ensurePolling() {
   const anyProcessing = state.items.some(it => it.processing);
   if (anyProcessing && !state.pollTimer) {
     state.pollTimer = setInterval(async () => {
-      await apiList();
+      // silent: background poll shouldn't show a retry toast on transient
+      // network blips — it'll just try again in 3s anyway.
+      await apiList({ silent: true });
       render();
     }, 3000);
   } else if (!anyProcessing && state.pollTimer) {

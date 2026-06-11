@@ -11,26 +11,66 @@
   <link rel="stylesheet" href="/static/trash.css" />
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/apple-touch-icon.png" />
-  <meta name="theme-color" content="#fef6ec" />
+  <meta name="theme-color" content="#fef6ec" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#241b15" media="(prefers-color-scheme: dark)" />
 </head>
 <body>
+  <a class="skip-link" href="#trash-list">跳到內容</a>
+
   <header class="hero">
     <h1>🗑 垃圾桶</h1>
     <p class="subtitle" id="ttl-line">30 天後自動永久消失</p>
   </header>
 
   <main class="trash-main">
-    <a class="back-link" href="/">← 回相簿</a>
+    <a class="back-link" href="/" aria-label="回到相簿首頁">← 回相簿</a>
+
     <div class="trash-toolbar" id="trash-toolbar" hidden>
-      <span id="trash-count"></span>
-      <button class="btn-danger" id="empty-all">🔥 清空垃圾桶</button>
+      <div class="toolbar-left">
+        <label class="select-all" title="全選 / 取消全選">
+          <input type="checkbox" id="select-all" aria-label="全選垃圾桶項目" />
+          <span class="select-all-box" aria-hidden="true"></span>
+          <span class="select-all-label">全選</span>
+        </label>
+        <span id="trash-count" aria-live="polite"></span>
+      </div>
+      <div class="toolbar-right">
+        <button class="btn-restore-batch" id="restore-selected" type="button" hidden>
+          <span aria-hidden="true">↻</span> 還原所選
+        </button>
+        <button class="btn-perma-batch" id="delete-selected" type="button" hidden>
+          <span aria-hidden="true">🗑</span> 刪除所選
+        </button>
+        <button class="btn-danger empty-all-btn" id="empty-all" type="button">
+          <span aria-hidden="true">🔥</span> 清空垃圾桶
+        </button>
+      </div>
     </div>
-    <div id="trash-list" class="trash-list">
-      <div class="loading">🐾 載入中…</div>
+
+    <div id="trash-list" class="trash-list" role="list" aria-busy="true">
+      <div class="loading" role="status">
+        <span class="loading-paw" aria-hidden="true">🐾</span>
+        <span>載入中…</span>
+      </div>
     </div>
   </main>
 
-  <div id="toast" class="toast" hidden></div>
+  <!-- Custom confirm dialog for destructive actions. Friendlier and more
+       accessible than native confirm(). -->
+  <div class="confirm-backdrop" id="confirm-backdrop" hidden>
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-body" tabindex="-1">
+      <div class="confirm-tape" aria-hidden="true"></div>
+      <div class="confirm-emoji" aria-hidden="true">😿</div>
+      <h2 class="confirm-title" id="confirm-title">確定嗎？</h2>
+      <p class="confirm-body" id="confirm-body"></p>
+      <div class="confirm-actions">
+        <button class="confirm-cancel" id="confirm-cancel" type="button">再想想</button>
+        <button class="confirm-ok" id="confirm-ok" type="button">確定</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script src="/static/trash.js"></script>
 </body>
 </html>
