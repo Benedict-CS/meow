@@ -13,7 +13,7 @@
 //
 // To force clients to drop old caches, bump CACHE_VERSION below.
 
-const CACHE_VERSION = 'v4';
+const CACHE_VERSION = 'v5';
 const SHELL_CACHE   = `cat-shell-${CACHE_VERSION}`;
 const STATIC_CACHE  = `cat-static-${CACHE_VERSION}`;
 const THUMBS_CACHE  = `cat-thumbs-${CACHE_VERSION}`;
