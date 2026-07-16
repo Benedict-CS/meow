@@ -258,7 +258,9 @@ def restore_from_trash(name: str) -> bool:
             data["files"][name] = entry["original"]
             h = entry["original"].get("hash", "")
             if h:
-                _hash_index[h] = name  # caller already holds _meta_lock; using internal dict directly is fine
+                # Re-register under _hash_lock (lock order is always meta -> hash,
+                # so calling this while holding _meta_lock is deadlock-free).
+                _hash_register(h, name)
         else:
             data["notes"][name] = entry["original"]
         save_meta(data)
@@ -667,17 +669,18 @@ def list_uploads():
     for p in UPLOAD_DIR.iterdir():
         if not p.is_file() or p.name.startswith("."):
             continue
+        st = p.stat()  # single stat call reused below (this runs per /api/list poll)
         m = meta.get(p.name, {})
         captured_at = m.get("captured_at")
         if not captured_at:
-            captured_at = datetime.fromtimestamp(p.stat().st_mtime).isoformat()
+            captured_at = datetime.fromtimestamp(st.st_mtime).isoformat()
         ext = p.suffix.lower()
         items.append({
             "name": p.name,
             "url": f"/uploads/{p.name}",
             "thumb_url": f"/thumbs/{p.stem}.jpg" if thumb_path(p.name).is_file() else f"/uploads/{p.name}",
-            "size": p.stat().st_size,
-            "mtime": p.stat().st_mtime,
+            "size": st.st_size,
+            "mtime": st.st_mtime,
             "captured_at": captured_at,
             "kind": "video" if ext in VIDEO_EXT else "image",
             "favorite": bool(m.get("favorite", False)),
@@ -956,7 +959,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _delete_one(self, name: str) -> bool:
         """Soft-delete: move file + thumb to trash, stash meta. 30-day retention.
-        Use ?hard=true on /api/delete to permanently delete (skip trash)."""
+        Permanent deletion happens later via /api/trash (or the 30-day purge)."""
         return trash_file(name)
 
     def _handle_upload(self):
@@ -1392,6 +1395,17 @@ def _backfill_hashes_async():
 
 
 def main():
+    # Startup banners below contain emoji. On consoles whose encoding can't
+    # represent them (e.g. Windows cp950/cp1252, where stdout uses a strict
+    # error handler) a bare print() raises UnicodeEncodeError and the server
+    # never starts. Fall back to a lenient error handler so those characters
+    # degrade gracefully instead of crashing boot. No-op on UTF-8 (Docker).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(errors="backslashreplace")
+        except Exception:
+            pass
+
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8000"))
     backfill_existing()

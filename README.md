@@ -79,6 +79,8 @@ python3 -m venv .venv
 
 `server.py` auto-detects `./.venv/lib/.../site-packages` at startup, so `python3 server.py` works too once the venv is built.
 
+> **Windows (bare Python).** The server also runs on Windows (`python server.py`). Install `ffmpeg` separately (e.g. via `winget install Gyan.FFmpeg`) if you want video transcoding and video thumbnails; images and HEIC still work without it. Console output degrades gracefully on non-UTF-8 code pages.
+
 ### Environment variables
 
 | Variable   | Default                          | Notes                                  |
